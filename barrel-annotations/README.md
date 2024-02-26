@@ -127,7 +127,3 @@ Note: the order of the metric extraction matters, as some of the metrics depend 
 ## Funding
 
 This project/research was supported by funding to the Blue Brain Project, a research center of the École polytechnique fédérale de Lausanne (EPFL), from the Swiss government’s ETH Board of the Swiss Federal Institutes of Technology.
-
-## License
-
-This work is licensed under `Creative Commons (CC BY) 4.0 <https://creativecommons.org/licenses/by/4.0/>`_
