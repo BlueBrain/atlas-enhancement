@@ -1,4 +1,4 @@
-# Enhancement of brain atlases with laminar coordinate systems: flatmaps and barrel column annotations
+# Enhancement of brain atlases with laminar coordinate systems: Flatmaps and barrel column annotations
 
 This code accompanies the manuscript "Enhancement of brain atlases with laminar coordinate systems: Flatmaps and barrel column annotations" by S. Bolaños-Puchet, A. Teska, et al.
 
@@ -7,7 +7,7 @@ Preprint containing full methods and applications availble on [bioRxiv](https://
 Accompanying data available on [Zenodo](https://zenodo.org/doi/10.5281/zenodo.8165004).
 
 
-## Depth and orientation field generation
+## Generation of depth and orientation fields
 
 To generate depth and orientation fields, please refer to the documentation of the following repositories:
 
@@ -15,7 +15,7 @@ To generate depth and orientation fields, please refer to the documentation of t
 * [atlas-placement-hints](https://github.com/BlueBrain/atlas-placement-hints/)
 
 
-## Flatmap
+## Flatmapping
 
 Complete workflow to generate flatmaps and perform flatmap-based applications. For more details find README.md in `flatmap`.
 
@@ -36,7 +36,7 @@ If you use the ``atlas-enhancement`` code or method for your research, we ask yo
 
 This project/research was supported by funding to the Blue Brain Project, a research center of the École polytechnique fédérale de Lausanne (EPFL), from the Swiss government’s ETH Board of the Swiss Federal Institutes of Technology.
 
-Copyright 2020-2024 Blue Brain Project/EPFL
+Copyright 2020-2024 Blue Brain Project/EPFL.
 
 
 ## License
