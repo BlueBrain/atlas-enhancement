@@ -1,0 +1,461 @@
+/*
+ * =====================================================================================
+ *
+ *       Filename:  main.cm
+ *
+ *    Description:  Generate streamlines by integrating orientation field, then
+ *                  compute intersections with requested projection surface
+ *
+ *        Version:  2.0
+ *        Created:  03/13/2020 07:30:24 PM
+ *       Revision:  none
+ *       Compiler:  gcc
+ *
+ *         Author:  Sirio Bolaños Puchet (SBP), sirio.bolanospuchet@epfl.ch
+ *   Organization:  EPFL Blue Brain Project
+ *
+ * =====================================================================================
+ */
+#include <stdio.h>
+#include <math.h>
+#include <inttypes.h>
+#include <assert.h>
+#include <ctype.h>
+
+#include <zlib.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+
+#include "interp_field.h"
+#include "streamline.h"
+
+%snippet std:logging_prefix = %{ "flatpath" %}
+%include "cmod/common.hm"
+%include "cmod/getopt.hm"
+
+%recall std:getopt_init_strnum (static = static, inline = inline)
+
+%table optab = (name,return,argument,type,variable,default,required,multiple,description) %tsv{
+	epsilon-zero	0	required	double		eps_zero	1E-2	false	false	near-zero epsilon
+	epsilon-one		1	required	double		eps_one		1E-2	false	false	near-one epsilon
+	offset-x		a	required	double		off_x		0.0		true	false	x coordinate offset
+	offset-y		b	required	double		off_y		0.0		true	false	y coordinate offset
+	offset-z		c	required	double		off_z		0.0		true	false	z coordinate offset
+	background		B	required	double		background	NAN		false	false	background value
+	depth			D	no			bool		do_depth	false	false	false	compute depth along full streamlines
+	epsrel			e	required	double		epsrel		1E-3	false	false	relative epsilon of ODE solver
+	epsabs			E	required	double		epsabs		1E-3	false	false	absolute epsilon of ODE solver
+	file			f	required	char*		file		%nul	false	false	input file with streamline initial points
+	full-only		F	no			bool		full_only	false	false	false	use full streamlines only
+	tstep			h	required	double		tstep		0.5		false	false	integration time step
+	height			H	no			bool		do_height	false	false	false	compute thickness along full streamlines
+	dim-x			i	required	size_t		dim_x		0		true	false	matrix x dimension
+	dim-y			j	required	size_t		dim_y		0		true	false	matrix y dimension
+	dim-z			k	required	size_t		dim_z		0		true	false	matrix z dimension
+	file-rdepth		l	required	char*		file_rdepth	%nul	false	false	matrix with relative depth information
+	proj-rdepth		L	required	double		proj_rdepth	0.5		false	false	relative depth of projection surface
+	maxiter			m	required	size_t		maxiter		4000	false	false	maximum iterations per streamline
+	nstep			n	required	size_t		nstep		2		false	false	number of time steps per integration step
+	nstep-path		N	required	size_t		nstep_path	1000	false	false	number of steps for height/depth integration
+	print			p	no			bool		do_print	false	false	false	print streamlines
+	output			o	required	char*		outfile		%nul	false	false	output file
+	output-dir		O	required	char*		outdir		streamlines		false	false	output directory
+	reverse			r	no			bool		reverse		false	false	false	reverse normals
+	proj-side		s	required	enum proj_side	proj_side	TOP	false	false	side of projection surface (bottom / top)
+	uncompressed	U	no			bool		uncompr		false	false	false	uncompressed input files
+	as-voxels		V	no			bool		asvox		false	false	false	interpret input points as voxel indices
+	voxel-x			u	required	double		vox_x		0.0		true	false	voxel x dimension
+	voxel-y			v	required	double		vox_y		0.0		true	false	voxel y dimension
+	voxel-z			w	required	double		vox_z		0.0		true	false	voxel z dimension
+	file-x			x	required	char*		file_x		%nul	true	false	matrix with normals x component
+	file-y			y	required	char*		file_y		%nul	true	false	matrix with normals y component
+	file-z			z	required	char*		file_z		%nul	true	false	matrix with normals z component
+%}
+
+%table optab_long = (name,return,argument,description) %tsv{
+	first		0	required	first voxel to process
+	last		0	required	last voxel to process
+	bin			0	no			output binary streamlines
+	randomize	0	no			randomize voxel indices
+	seed		0	required	set random seed
+%}
+
+%snippet optab_do = (opt) %{
+    switch(${opt}) {
+        case 'D': opts.full_only = true; break;
+        case 'e': %| std:ensure(`opts.epsrel > 0.0`) |% break;
+        case 'E': %| std:ensure(`opts.epsabs > 0.0`) |% break;
+        case 'h': %| std:ensure(`opts.tstep > 0.0`) |% break;
+        case 'H': opts.full_only = true; break;
+        case 's':
+            if(strncasecmp(optarg,"bottom",3) == 0) opts.proj_side = BOTTOM;
+            else if(strncasecmp(optarg,"top",3) == 0) opts.proj_side = TOP;
+            else {
+                error("Please specify %s: \"top\" or \"bottom\"",optlabel);
+                return 1;
+            }
+            break;
+    }
+%}
+
+%snippet optab_long_do = (opt) %{
+    switch(${opt}) {
+        case 0: // --first
+            %recall std:getopt_default_action:size_t (first)
+            break;
+        case 1: // --last
+            %recall std:getopt_default_action:size_t (last)
+            break;
+        case 2: // --bin
+            save_binary = true;
+            break;
+        case 3: // --randomize
+            do_randomize = true;
+            break;
+        case 4: // --seed
+            %recall std:getopt_default_action:unsigned_long_long (seed)
+            break;
+    }
+%}
+
+void print_usage(void) {
+    puts("flatpath: project voxels following streamlines");
+    %recall std:getopt_usage (optab,optab_long)
+}
+
+%snippet std:getopt_help = (optab,optab_long) %{
+    print_usage();
+%}
+
+%table "xij.tsv"
+
+int main(int argc, char *argv[]) {
+    gsl_set_error_handler_off(); // let us handle GSL errors
+
+    size_t first = 0;
+    size_t last = 0;
+    bool save_binary = false;
+    bool do_randomize = false;
+    unsigned long long seed = 0xBB5; // initial random seed, only used for shuffling
+
+    /* BEGIN option parsing */
+    %recall std:getopt_handle (optab,optab_do,optab_long,optab_long_do)
+
+    if(opts.do_height_isset && opts.do_depth_isset) {
+        error("Please specify only one of %s and %s",
+              %| std:getopt_label:lazy (height) |%,
+              %| std:getopt_label:lazy (depth) |%);
+        return 1;
+    }
+    /* END option parsing */
+
+    size_t dim[3] = { opts.dim_x, opts.dim_y, opts.dim_z };
+    size_t dim01 = (size_t)dim[0] * dim[1];
+    size_t dim012 = (size_t)dim[0] * dim[1] * dim[2];
+
+    %map {L,X,Y,Z}(v) %{
+        float *${v} = malloc(dim012 * sizeof(float)); assert(${v} != NULL);
+    %}
+
+#define NFILES 4
+    { // load files in parallel
+        const char *src[NFILES] = { opts.file_rdepth, opts.file_x, opts.file_y, opts.file_z };
+        float *dst[NFILES] = { L, X, Y, Z };
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for(size_t i = 0; i < NFILES; ++i) {
+            if(opts.uncompr) {
+                FILE *fp = fopen(src[i],"rb"); assert(fp != NULL);
+                size_t nread = fread(dst[i],sizeof(float),dim012,fp); assert(nread == dim012);
+                fclose(fp);
+            } else {
+                gzFile zfp = gzopen(src[i],"rb"); assert(zfp != NULL);
+                size_t nread = gzfread(dst[i],sizeof(float),dim012,zfp); assert(nread == dim012);
+                gzclose(zfp);
+            }
+        }
+    }
+    info0("Successfully loaded matrices");
+
+    /* make normal vectors unit norm */
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for(size_t ix = 0; ix < dim012; ix++) {
+        const double norm = gsl_hypot3(X[ix],Y[ix],Z[ix]);
+        const double norm_checked = norm > NORM_EPSILON ? norm : 1.0;
+        %map xij %{ $U{x}[ix] /= norm_checked; %}
+    }
+
+    /* optionally reverse normals */
+    if(opts.reverse)
+        for(size_t ix = 0; ix < dim012; ix++) { %map xij %{ $U{x}[ix] *= -1.0; %} }
+
+    /* setup streamline initial positions */
+    size_t npoint = 0;
+    double *points = NULL; // Cartesian coordinates (um)
+    size_t *ixvox = NULL; // voxel indices
+
+    if(opts.file_isset) { // get points from file
+        bool is_stdin = (strcmp(opts.file,"-") == 0);
+        FILE *fp = is_stdin ? stdin : fopen(opts.file,"r");
+        assert(fp != NULL);
+        size_t n = 0;
+        char *line = NULL;
+        while(getline(&line,&n,fp) != -1) {
+            if(opts.asvox) {
+                unsigned long j,i,k;
+                if(sscanf(line,"%lu %lu %lu",&j,&i,&k) == 3) {
+                    ++npoint;
+                    double yinit[3];
+                    %map xij %{
+                    yinit[${i}] = opts.off_${x} + opts.vox_${x} * (${j} + 0.5);
+                    %}
+                    points = realloc(points,(npoint * 3) * sizeof(*points));
+                    ixvox = realloc(ixvox,(npoint * 3) * sizeof(*ixvox));
+                    memcpy(&points[3 * (npoint - 1)],yinit,3 * sizeof(*points));
+                    ixvox[npoint - 1] = (size_t)j + i * dim[0] + k * dim01;
+                } else { error("expected three voxel indices in line: %s",line); return 1; }
+            } else {
+                double x,y,z;
+                if(sscanf(line,"%lf %lf %lf",&x,&y,&z) == 3) {
+                    const double yinit[3] = { x, y, z };
+                    points = realloc(points,(++npoint * 3) * sizeof(double));
+                    memcpy(&points[3 * (npoint - 1)],yinit,3 * sizeof(double));
+                } else { error("expected three coordinates in line: %s",line); return 1; }
+            }
+        }
+        if(fp != stdin) fclose(fp);
+        info("Using %zu initial positions from file \"%s\"",npoint,
+                is_stdin ? "<stdin>" : opts.file);
+    } else { // use voxel centers
+        /* count first, in parallel */
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:npoint)
+#endif
+        for(size_t ix = 0; ix < dim012; ++ix) {
+            if((isnan(opts.background) && isnan(L[ix])) ||
+                    (!isnan(opts.background) && L[ix] == opts.background)) continue;
+            npoint++; // layer different from background means we take it
+        }
+        /* allocate at once */
+        points = malloc((size_t)3 * npoint * sizeof(*points)); assert(points != NULL);
+        ixvox = malloc(npoint * sizeof(*ixvox)); assert(ixvox != NULL);
+        /* collect */
+        for(size_t ix = 0, ipt = 0; ix < dim012; ++ix) {
+            if((isnan(opts.background) && isnan(L[ix])) ||
+                    (!isnan(opts.background) && L[ix] == opts.background)) continue;
+            const size_t vx = ix;
+            %map xij %{ const size_t ${j} = ${vx}; %} // unravel
+
+            double *yinit = &points[3 * ipt]; // point location
+            %map xij %{
+            yinit[${i}] = opts.off_${x} + opts.vox_${x} * (${j} + 0.5);
+            %}
+            ixvox[ipt] = ix; // save point index
+            ++ipt; // increase index
+        }
+        info("Using %zu voxels centers from mask as initial positions",npoint);
+    }
+
+    /* determine which streamlines to process, and in which order */
+    size_t *ord = malloc(npoint * sizeof(size_t)); // global voxel index order
+    if(NULL == ord) return ENOMEM;
+
+    for(size_t i=0;i<npoint;i++) ord[i] = i; // monotonic increasing order
+
+    if(do_randomize) { /* randomize order of voxel indices */
+        const gsl_rng_type *T = gsl_rng_ranlxd2; /* RANLUX double-precision w/luxury level 2 */
+        gsl_rng *r = gsl_rng_alloc(T);
+        gsl_rng_set(r,seed);
+        gsl_ran_shuffle(r,ord,npoint,sizeof(size_t));
+        gsl_rng_free(r);
+        info("Done shuffling voxel indices with seed %""#llX",seed);
+    }
+
+    if(first >= npoint) {
+        warn0("First index larger than total points, nothing to do");
+        return 1;
+    }
+    if(last == 0 || last > npoint) last = npoint;
+    if(last <= first) {
+        error("Please specify --%s < --%s",
+              %| std:getopt_label:lazy (first) |%,
+              %| std:getopt_label:lazy (last) |%);
+        return 1;
+    }
+    info("Processing points with index %zu to %zu",first,last - 1);
+
+    /* open output file */
+    FILE *fpout = stdout;
+    if(opts.outfile_isset && !(opts.outfile[0] == '-' && opts.outfile[1] == '\0'))
+        fpout = fopen(opts.outfile, "w");
+    assert(NULL != fpout);
+
+    /* common parameters */
+    struct interp_params p = {
+        %map xij %{ .${x}=$U{x}, .v${x}=opts.vox_${x}, .o${x}=opts.off_${x}, %}
+        .rdepth=L, .nx=dim[0], .ny=dim[1], .nz=dim[2],
+        .proj_rdepth=opts.proj_rdepth,.proj_side=opts.proj_side,
+        .eps_zero=opts.eps_zero,
+        .eps_one=opts.eps_one
+    };
+
+    /* storage for streamlines */
+    size_t *sn = calloc(npoint,sizeof(size_t)); // array lengths
+    if(NULL == sn) return ENOMEM;
+    double **sx = calloc(npoint,sizeof(double*)); // positions
+    if(NULL == sx) return ENOMEM;
+
+    { // compute streamlines
+        /* setup ODE system with interpolated direction field */
+        gsl_odeiv2_system sys = { dirfield, NULL, 3, &p };
+
+        /* parallelize across initial positions */
+#ifdef _OPENMP
+#pragma omp parallel
+        {
+#endif
+            gsl_odeiv2_driver *d =
+                gsl_odeiv2_driver_alloc_y_new(&sys,gsl_odeiv2_step_rk2,opts.tstep,opts.epsabs,opts.epsrel);
+
+#ifdef _OPENMP
+#pragma omp for
+#endif
+            for(size_t ii=first;ii<last;ii++) {
+                const size_t ix = ord[ii];
+                const double *const yinit = &points[3 * ix];
+#if DEBUG
+                if(ixvox != NULL) {
+                    const size_t vx = ixvox[ix];
+                    %map xij %{ const size_t ix_${j} = ${vx}; %}
+                    info("Initial X %g Y %g Z %g [%zu %zu %zu] -> %g",
+                            %map xij %{ yinit[${i}], %} %map xij %{ ix_${j}, %}
+                            get_rdepth(yinit[0],yinit[1],yinit[2],&p));
+                }
+#endif
+
+                int ret = compute_streamline(d,yinit,ix,opts.tstep,opts.maxiter,opts.nstep,&p,&sn[ix],&sx[ix]);
+                if(ret) warn("Streamline %zu returned %d",ix,ret);
+            }
+
+            gsl_odeiv2_driver_free(d);
+#ifdef _OPENMP
+        }
+#endif
+    }
+
+    if(opts.do_print) { // output streamlines
+        char buf[PATH_MAX];
+        snprintf(buf,sizeof(buf),"%s/index.txt",opts.outdir);
+        FILE *fp = fopen(buf,"a"); assert(fp != NULL);
+        if(save_binary) {
+            for(size_t ii=first;ii<last;ii++) {
+                const size_t ix = ord[ii];
+                char buf[PATH_MAX];
+                snprintf(buf,sizeof(buf),"%s/streamline_%08zu.bin",opts.outdir,ix);
+                float *bufsave = malloc(3 * sn[ix] * sizeof(float));
+                for(size_t i=0;i<3 * sn[ix];i++) bufsave[i] = sx[ix][i]; /* double to float */
+                FILE *fpb = fopen(buf,"wb"); assert(fpb != NULL);
+                fwrite(bufsave,sizeof(float),3 * sn[ix],fpb);
+                free(bufsave);
+                fclose(fpb);
+                fprintf(fp,"%08zu %zu\n",ix,sn[ix]); // print to index
+            }
+        } else {
+            for(size_t ii=first;ii<last;ii++) {
+                const size_t ix = ord[ii];
+                char buf[PATH_MAX];
+                snprintf(buf,sizeof(buf),"%s/streamline_%08zu.xyz",opts.outdir,ix);
+                FILE *fpt = fopen(buf,"w"); assert(fpt != NULL);
+                for(size_t i=0;i<sn[ix];i++)
+                    fprintf(fpt,"%.8f %.8f %.8f\n"%map xij %{ ,sx[ix][3 * i + ${i}] %});
+                fclose(fpt);
+                fprintf(fp,"%08zu %zu\n",ix,sn[ix]); // print to index
+            }
+        }
+        fclose(fp);
+    }
+
+    if(opts.do_height || opts.do_depth) { // compute height/depth along streamlines
+        info("Computing %s along full streamlines",opts.do_height ? "height" : "depth");
+
+        // NOTE: parallelization would require independent params per thread
+        for(size_t ii=first;ii<last;ii++) {
+            const size_t ix = ord[ii];
+
+            const double *const yinit = &points[3 * ix];
+            %map xij %{ size_t ix_${j} = 0; %}
+            if(ixvox != NULL) {
+                const size_t vx = ixvox[ix];
+                %map xij %{ ix_${j} = ${vx}; %}
+            }
+
+            double value = NAN;
+            if(sn[ix] >= 2)
+                streamline_measure(ix,sn[ix],sx[ix],yinit,&p,opts.do_height,opts.nstep_path,&value);
+
+            if(ixvox != NULL) // use voxel indices
+                fprintf(fpout,"%zu %zu %zu %.16g\n"%map xij %{ ,ix_${j} %},value);
+            else // use point index
+                fprintf(fpout,"%zu %.16g\n",ix,value);
+        }
+    }
+
+    else if(opts.proj_rdepth > 0) { // compute intersection with projection surface
+        info("Taking projection surface at relative depth %g",opts.proj_rdepth);
+
+        if(opts.full_only) { info0("Using full streamlines only"); }
+        else info0("Using all streamlines");
+
+        gsl_root_fsolver *rs = gsl_root_fsolver_alloc(gsl_root_fsolver_brent);
+
+        // NOTE: parallelization would require independent root solvers per thread
+        for(size_t ii=first;ii<last;ii++) {
+            const size_t ix = ord[ii];
+
+            const double *const yinit = &points[3 * ix];
+            %map xij %{ size_t ix_${j} = 0; %}
+            if(ixvox != NULL) {
+                const size_t vx = ixvox[ix];
+                %map xij %{ ix_${j} = ${vx}; %}
+            }
+
+            double isec[3] = { NAN, NAN, NAN };
+            if(sn[ix] >= 2) streamline_intersection(ix,sn[ix],sx[ix],yinit,&p,opts.full_only,rs,isec);
+
+            if(ixvox != NULL) // use voxel indices
+                fprintf(fpout,"%zu %zu %zu %.16g %.16g %.16g\n"%map xij %{ ,ix_${j} %},
+                       isec[0],isec[1],isec[2]);
+            else // use point index
+                fprintf(fpout,"%zu %.16g %.16g %.16g\n",ix,isec[0],isec[1],isec[2]);
+        }
+
+        gsl_root_fsolver_free(rs);
+    }
+
+    /* close output file */
+    fclose(fpout);
+
+    /* cleanup streamlines */
+    for(size_t i=0;i<npoint;i++) free(sx[i]);
+    free(sn);
+    free(sx);
+
+    /* cleanup points */
+    free(points);
+    free(ixvox);
+    free(ord);
+
+    /* cleanup volumes */
+    %map {L,X,Y,Z}(v) %{ free(${v}); %}
+
+    /* cleanup options */
+    %recall std:getopt_cleanup (optab)
+}

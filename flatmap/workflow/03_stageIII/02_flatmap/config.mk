@@ -1,0 +1,15 @@
+# path to executable
+MAKE_FLATMAP_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/make_flatmap.py
+
+# DO NOT EDIT BELOW THIS LINE
+override INPUTS := input/$(FLAT_MESH_FILE)\
+	input/$(VOXEL_PROJECTIONS_INDEX_FILE)\
+	input/$(NEAREST_VERTICES_FILE)\
+	input/$(RELATIVE_DEPTH_FILE)
+
+override OUTPUTS := output/$(FLATMAP_FILE)\
+	output/$(FLATMAP_NRRD_FILE)
+
+override USER_PARAMETERS := FLATMAP_EXTRA
+
+override USER_BINARIES := MAKE_FLATMAP_BIN

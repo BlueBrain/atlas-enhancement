@@ -1,0 +1,11 @@
+# path to executable
+FLAT_HEXGRID_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/flat_hexgrid.py
+
+# DO NOT EDIT BELOW THIS LINE
+override INPUTS := input/$(FLATMAP_NRRD_FILE)
+
+override OUTPUTS := output/$(VOLUME_DECOMPOSITION_NRRD_FILE)
+
+override USER_PARAMETERS := HEXGRID_DIAMETER
+
+override USER_BINARIES := FLAT_HEXGRID_BIN

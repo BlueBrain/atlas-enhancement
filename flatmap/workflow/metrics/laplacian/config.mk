@@ -1,0 +1,12 @@
+# path to executable
+METRICS_LAPLACIAN_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/metrics/laplacian.py
+
+# DO NOT EDIT BELOW THIS LINE
+override INPUTS := input/$(RELATIVE_DEPTH_FILE)\
+	input/$(MASK_FILE)
+
+override OUTPUTS := output/$(METRICS_LAPLACIAN_NRRD_FILE)
+
+override USER_PARAMETERS :=
+
+override USER_BINARIES := METRICS_LAPLACIAN_BIN

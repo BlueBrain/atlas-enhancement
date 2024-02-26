@@ -1,0 +1,11 @@
+# path to executable
+RECONSTRUCT_SURFACE_BIN := $(SOURCE_CODE_ROOT)/surf_cgal/build/Reconstruct_PCAlpha
+
+# DO NOT EDIT BELOW THIS LINE
+override INPUTS := input/$(ISOSURFACE_DOTS_FILE)
+
+override OUTPUTS := output/$(PROJECTION_MESH_FILE)
+
+override USER_PARAMETERS := RECONSTRUCT_SURFACE_EXTRA
+
+override USER_BINARIES := RECONSTRUCT_SURFACE_BIN

@@ -1,0 +1,12 @@
+DATADIR := $(HOME)/allen_conn_data
+ATLAS := ../../atlas/ccf_2017
+RESULTS_DIR := ../../results/isocortex_iter
+REGIONS := $(ATLAS)/isocortex_regions_10.nrrd
+LAYERS := $(ATLAS)/isocortex_layers_10.nrrd
+FLATMAP_BOTH := $(RESULTS_DIR)/flatmap_float_both.nrrd
+FLATMAP := $(RESULTS_DIR)/flatmap_float.nrrd
+CONFIG := $(RESULTS_DIR)/config.mk
+PALETTE := \#a6cee3 \#1f78b4 \#b2df8a \#33a02c \#fb9a99 \#e31a1c \#fdbf6f \#ff7f00 \#cab2d6 \#6a3d9a \#ffff99# PAIRED11
+#PALETTE := \#a6cee3 \#1f78b4 \#b2df8a \#33a02c \#6a3d9a \#e31a1c \#fdbf6f \#ff7f00 \#cab2d6 \#fb9a99 \#ffff99# PAIRED11 alternate order
+#PALETTE := \#9DAFFF \#2A4BD7 \#81C57A \#1D6914 \#E9DEBB \#AD2323 \#814A19 \#FF9233 \#8126C0 \#FFCDF3 \#FFEE33# Wad's optimal
+COLORING := 1 5 10 11 7 7 8 9 10 1 3 2 9 3 4 2 5 6 5 2 8 7 8 11 9 4 6 10 11 7 1 3 6 1 6 4 10 9 3 4 5 2 8# from 11-color graph coloring

@@ -1,0 +1,11 @@
+# path to executable
+DISCRETIZE_FLATMAP_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/discretize_flatmap.py
+
+# DO NOT EDIT BELOW THIS LINE
+override INPUTS := input/$(FLATMAP_NRRD_FILE)
+
+override OUTPUTS := output/$(FLATMAP_DISCRETE_NRRD_FILE)
+
+override USER_PARAMETERS := PIXEL_RESOLUTION
+
+override USER_BINARIES := DISCRETIZE_FLATMAP_BIN

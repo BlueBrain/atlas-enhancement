@@ -1,0 +1,12 @@
+# path to executable
+SPATIAL_NN_SEARCH_BIN := $(SOURCE_CODE_ROOT)/surf_cgal/build/Nearest_KNN
+
+# DO NOT EDIT BELOW THIS LINE
+override INPUTS := input/$(REFINED_MESH_FILE)\
+	input/$(VOXEL_PROJECTIONS_POSITION_FILE)
+
+override OUTPUTS := output/$(NEAREST_VERTICES_FILE)
+
+override USER_PARAMETERS :=
+
+override USER_BINARIES := SPATIAL_NN_SEARCH_BIN
