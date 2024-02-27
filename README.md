@@ -17,12 +17,12 @@ To generate depth and orientation fields, please refer to the documentation of t
 
 ## Flatmapping
 
-Complete workflow to generate flatmaps and perform flatmap-based applications. For more details, please look at README.md in `flatmap`.
+Complete workflow to generate flatmaps and perform flatmap-based applications. For more details, please look at the [README](flatmap/README.md) in `flatmap`.
 
 
 ## Annotation of barrels and barrel columns 
 
-Code needed to add barrel cortex annotations to the CCFv3 Allen Atlas at 10 $\mu m$ resolution. For more details, please look at README.md in `barrel-annotations`.
+Code needed to add barrel cortex annotations to the CCFv3 Allen Atlas at 10 $\mu m$ resolution. For more details, please look at the [README](barrel-annotations/README.md) in `barrel-annotations`.
 
 
 ## Citation
