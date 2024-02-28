@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from voxcell import RegionMap, VoxelData
 
-from atlas_splitter.utils import (
+from utils_splitter import (
     _assert_is_leaf_node,
     create_id_generator,
     get_isocortex_hierarchy,
