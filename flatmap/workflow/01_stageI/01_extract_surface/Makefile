@@ -15,4 +15,9 @@ view-isosurface-dots:
 	$(GNUPLOT) -p .tmp.gp -
 	$(RM) .tmp.gp
 
+## do manual edits
+.PHONY:
+edit:
+	$(NRRD_EDITOR) output/$(ISOSURFACE_NRRD_FILE)
+
 include ../../common_footer.mk

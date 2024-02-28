@@ -1,17 +1,14 @@
 ifndef ATLAS_ENHANCEMENT_ROOT
-$(error Please set ATLAS_ENHANCEMENT_ROOT to absolute path of atlas-enhancement)
+$(error Please set ATLAS_ENHANCEMENT_ROOT to location of atlas-enhancement)
 endif
 
 ifndef USER_DATA_ROOT
-$(error Please set USER_DATA_ROOT to absolute path of user data)
-endif
-
-ifeq (,$(wildcard $(USER_DATA_ROOT)/config.mk))
-$(error User configuration file not present at $$USER_DATA_ROOT/config.mk)
+$(error Please set USER_DATA_ROOT to location of user data)
 endif
 
 SOURCE_CODE_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/code
 WORKFLOW_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/workflow
+include $(WORKFLOW_ROOT)/userdata.mk
 
 # set shell (more modern than sh)
 SHELL := /bin/bash
@@ -41,6 +38,7 @@ GNUPLOT := gnuplot
 GEOMVIEW := geomview
 IMAGE_VIEWER := feh
 NRRD_VIEWER := xgrid3d
+NRRD_EDITOR := xgrid3d
 
 # DO NOT EDIT BELOW THIS LINE
 STAGE_I_ROOT := $(WORKFLOW_ROOT)/01_stageI
@@ -75,18 +73,6 @@ STEPS := $(FLATMAP_STEPS)\
 
 DEFAULT_STEPS := $(FLATMAP_STEPS)
 
-## user input (atlas data)
-RELATIVE_DEPTH_FILE := relative_depth.nrrd
-ORIENTATION_X_FILE := orientation_x.nrrd
-ORIENTATION_Y_FILE := orientation_y.nrrd
-ORIENTATION_Z_FILE := orientation_z.nrrd
-ANNOTATIONS_FILE := annotations.nrrd
-MASK_FILE := mask.nrrd
-USER_INPUT_ORIENTATION_FILES := $(ORIENTATION_X_FILE)\
-								$(ORIENTATION_Y_FILE)\
-								$(ORIENTATION_Z_FILE)
-USER_INPUT_FILES := $(RELATIVE_DEPTH_FILE)\
-					$(USER_INPUT_ORIENTATION_FILES)
 ## stageI
 ISOSURFACE_NRRD_FILE := isosurface_dots.nrrd
 ISOSURFACE_DOTS_FILE := isosurface_dots.xyz

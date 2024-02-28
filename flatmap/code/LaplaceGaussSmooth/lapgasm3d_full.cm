@@ -1,0 +1,1100 @@
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <time.h>
+
+enum load_mode {
+    LOAD_MMAP,
+    LOAD_PARALLEL,
+    LOAD_SEQUENTIAL
+};
+
+enum save_mode {
+    SAVE_PARALLEL,
+    SAVE_SEQUENTIAL
+};
+
+#define UNCOORD_DIM(x,jik,nx,dim) \
+    jik[0] = ((x) % (dim)) % (nx); \
+    jik[1] = ((x) % (dim)) / (nx); \
+    jik[2] =  (x) / (dim);
+
+static volatile sig_atomic_t keepRunning = 1;
+static volatile sig_atomic_t nint = 0;
+
+#define TERMINATE_MSG "[lapgasm3d_full]  WARN: interrupt caught, will stop after current iteration (send again for immediate termination)\n"
+static void terminate_handler(int sig) {
+    if(nint++) {
+        (void)signal(sig,SIG_DFL); // reset handler
+        (void)raise(sig);          // raise again
+    }
+    keepRunning = 0;
+    write(STDERR_FILENO,TERMINATE_MSG,strlen(TERMINATE_MSG));
+}
+
+#define CREAT_MASK (S_IRUSR | S_IWUSR | S_IRGRP)
+#define MAX_RETRY_SAVE 100
+
+#define ERRFATAL(FUN,FMT,...) { error("%s failed: %s (%d): " FMT,FUN,strerror(errno),errno,__VA_ARGS__); exit(EXIT_FAILURE); }
+#define PERROR(FUN) ERRFATAL(FUN,"at line %d",__LINE__)
+#define FATAL(M,...) { error(M,__VA_ARGS__); exit(EXIT_FAILURE); }
+#define FATAL0(M) { error0(M); exit(EXIT_FAILURE); }
+
+%snippet std:logging_prefix = %{ "lapgasm3d_full" %}
+%include "cmod/getopt.hm"
+
+%table optab = (name,return,argument,type,variable,default,required,multiple,description) %tsv{
+	boundaries	b	required	char*	bnd_file	%nul	false	false	boundary values file
+	bound-vals	B	required	char*	bnd_vals	%nul	false	false	boundary values comma-separated list
+	convert-u16	C	no			bool	conv_u16	false	false	false	convert float[0,1] to uint16[0,65533]
+	delta		d	required	double	delta_tol	1E-9	false	false	absolute delta tolerance for convergence
+	delta-bnd	D	required	double	delta_bnd	1E-6	false	false	relative delta tolerance for boundary update
+	convert-f32	F	no			bool	conv_f32	false	false	false	convert uint16[0,65533] to float[0,1]
+	get-mask	G	no			bool	get_mask	false	false	false	generate mask from input file
+	initial		i	required	char*	init_file	%nul	false	false	file with initial solution
+	labels		l	required	char*	labels_file	%nul	false	false	file with labels (uint8)
+	mask		m	required	char*	mask_file	%nul	false	false	file with mask (uint8)
+	mask-nums	M	required	char*	nmask_file	%nul	false	false	file with per-slice mask sizes (uint64)
+	itermax		n	required	size_t	iter_max	1000	false	false	maximum number of iterations
+	output		o	required	char*	out_file	stdout	false	false	output file
+	regions		r	required	uint8_t	nregion		7		false	false	number of regions
+	xdim		x	required	size_t	nx			6145	false	false	size of x dimension
+	ydim		y	required	size_t	ny			4310	false	false	size of y dimension
+	zdim		z	required	size_t	nz			7406	false	false	size of z dimension
+%}
+
+%table optab_long = (name,return,argument,description) %tsv{
+	mmap		0	no		map input file directly from memory (default)
+	parload		0	no		load input file from disk in parallel
+	seqload		0	no		load input file from disk sequentially
+	parsave		0	no		save output in parallel (default)
+	seqsave		0	no		save output sequentially
+%}
+
+%snippet optab_do = (opt) %{
+    switch(${opt}) {
+        case 'd': %| std:getopt_ensure (`opts.delta_tol > 0`) |% break;
+    }
+%}
+
+%snippet optab_long_do = (opt) %{
+    switch(${opt}) {
+        case 0: // --mmap
+            loadm = LOAD_MMAP;
+            break;
+        case 1: // --parload
+            loadm = LOAD_PARALLEL;
+            break;
+        case 2: // --seqload
+            loadm = LOAD_SEQUENTIAL;
+            break;
+        case 3: // --parsave
+            savem = SAVE_PARALLEL;
+            break;
+        case 4: // --seqsave
+            savem = SAVE_SEQUENTIAL;
+            break;
+    }
+%}
+
+void print_usage(void) {
+    printf("lapgasm3d_full: heat equation approximation through iterative gaussian smoothing in 3D (full version)\n");
+    %recall std:getopt_usage (optab,optab_long)
+}
+
+%snippet std:getopt_help = (optab,optab_long) %{
+    print_usage();
+%}
+
+%recall std:getopt_init_strnum
+
+/* regions are: 6 cortical layers + WM */
+#define U16FACTOR (UINT16_MAX - 2)
+#define OUT_FLT (2.0)
+#define WM_FLT (-1.0)
+
+#define U16DATA 1
+#define FLTDATA 0
+
+#define INBND(msk) ((msk) > 0)
+#define INMASK_LABEL(x) ((x) >= 1 && (x) <= 6)
+
+#if U16DATA
+typedef uint16_t data_t;
+#define PRIdata PRIu16
+#define INMASK(x) ((x) <= U16FACTOR)
+#define TOFLOAT(x) ((double)(x) / U16FACTOR)
+#define FROMFLOAT(x) ((x) * U16FACTOR)
+#define PRINTBND(M) \
+    info0(M); \
+    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %"PRIdata" (%g)",bnd_vals[i],TOFLOAT(bnd_vals[i]));
+#elif FLTDATA
+typedef float data_t;
+#define PRIdata "g"
+#define INMASK(x) ((x) >= WM_FLT && (x) <= OUT_FLT)
+#define TOFLOAT(x) (x)
+#define FROMFLOAT(x) (x)
+#define PRINTBND(M) \
+    info0(M); \
+    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %"PRIdata,bnd_vals[i]);
+#endif
+
+#define NX (dims.nx)
+#define NY (dims.ny)
+#define NZ (dims.nz)
+#define NXY (NX * NY)
+#define NVOX (NXY * NZ)
+
+struct _dims {
+    size_t nx;
+    size_t ny;
+    size_t nz;
+};
+
+#define NHOOD_NEUMANN_N 7
+
+inline static void get_nhood3d_neumann(size_t ix, const data_t *restrict array, struct _dims dims, data_t buf[restrict static NHOOD_NEUMANN_N]) {
+    buf[0] = array[(int64_t)ix - NXY];
+    buf[1] = array[(int64_t)ix - NX];
+    buf[2] = array[(int64_t)ix - 1];
+    buf[3] = array[(int64_t)ix];
+    buf[4] = array[(int64_t)ix + 1];
+    buf[5] = array[(int64_t)ix + NX];
+    buf[6] = array[(int64_t)ix + NXY];
+}
+
+inline static void get_nhood3d_neumann_u8(size_t ix, const uint8_t *restrict array, struct _dims dims, uint8_t buf[restrict static NHOOD_NEUMANN_N]) {
+    buf[0] = array[(int64_t)ix - NXY];
+    buf[1] = array[(int64_t)ix - NX];
+    buf[2] = array[(int64_t)ix - 1];
+    buf[3] = array[(int64_t)ix];
+    buf[4] = array[(int64_t)ix + 1];
+    buf[5] = array[(int64_t)ix + NX];
+    buf[6] = array[(int64_t)ix + NXY];
+}
+
+/* gaussian kernel (at approx 1.889 std devs) */
+#define KERNEL_SIZE 3
+#define KERNEL_HSIZE 1
+#define KERNEL_VSIZE NHOOD_NEUMANN_N
+static const double kernel[KERNEL_VSIZE] = {
+
+            0x1p-3,
+
+
+            0x1p-3,
+    0x1p-3, 0x1p-2, 0x1p-3,
+            0x1p-3,
+
+
+            0x1p-3
+
+};
+
+inline static double dotproduct(const double a[restrict static KERNEL_VSIZE], const double b[restrict static KERNEL_VSIZE]) {
+    double sum = 0.0;
+    for(int i = 0; i < KERNEL_VSIZE; ++i)
+        sum += a[i] * b[i];
+    return sum;
+}
+
+inline static double convolve(struct _dims dims, const data_t *restrict res, size_t gix) {
+    double sum = 0.0;
+    data_t nhood[KERNEL_VSIZE];
+    double buf[KERNEL_VSIZE];
+
+    get_nhood3d_neumann(gix,res,dims,nhood);
+    for(int i = 0; i < KERNEL_VSIZE; ++i)
+        buf[i] = TOFLOAT(nhood[i]);
+    sum = dotproduct(buf,kernel); // compute convolution
+    if(sum > 1.0) sum = 1.0; // clamp hi
+    else if(sum < 0.0) sum = 0.0; // clamp lo
+
+    return sum;
+}
+
+%snippet slice_rle_loop = (mask_cond, action) %{
+for(size_t k = 1; k < NZ - 1; ++k) {
+    data_t *slice = &res[k * NXY]; %unused slice;
+    for(size_t i = 0, im = 0; i < slice_rle_n[k]; ++i) {
+        for(size_t ix = slice_rle_start[k][i]; ix <= slice_rle_end[k][i]; ++ix, ++im) {
+            uint8_t msk = maskptr[k][im];
+            if(${mask_cond}) {
+                ${action}
+            }
+        }
+    }
+}
+%}
+
+%snippet delineate_boundaries = (condition = `msk > 0`) %{
+// delineate boundaries
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(res,maskptr,bnd_vals) shared(slice_rle_n,slice_rle_start,slice_rle_end,dims) schedule(dynamic)
+#endif
+%recall slice_rle_loop (mask_cond = $b{condition},
+    action = %<< slice[ix] = bnd_vals[maskptr[k][im]]; >>%)
+%}
+
+%snippet smoothen = (condition = `msk == 0`) %{
+// smoothen
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+%recall slice_rle_loop (mask_cond = $b{condition},
+    action = %<< maskvalsptr[k][im] = FROMFLOAT(convolve(dims,res,(size_t)ix + k * NXY)); >>%)
+%}
+
+%snippet smoothen_and_delta = (condition = `msk == 0`) %{
+// smoothen and compute delta
+#ifdef _OPENMP
+#pragma omp for reduction(+:diff) schedule(dynamic)
+#endif
+%recall slice_rle_loop (mask_cond = $b{condition},
+    action = %<<
+double sum = convolve(dims,res,(size_t)ix + k * NXY);
+maskvalsptr[k][im] = FROMFLOAT(sum);
+diff += fabs(sum - TOFLOAT(slice[ix]));
+>>%)
+%}
+
+%snippet writeback_to_array = (condition = `msk == 0`) %{
+// write back to array buffer
+#ifdef _OPENMP
+#pragma omp for schedule(dynamic)
+#endif
+%recall slice_rle_loop (mask_cond = $b{condition},
+    action = %<< slice[ix] = maskvalsptr[k][im]; >>%)
+%}
+
+int main(int argc, char *argv[]) {
+    enum load_mode loadm = LOAD_MMAP;
+    enum save_mode savem = SAVE_PARALLEL;
+
+    %recall std:getopt_handle (optab,optab_do,optab_long,optab_long_do)
+    size_t NREGION = opts.nregion; //XXX: making this const results in internal compiler error with GCC 13.1.1
+
+    struct _dims dims = { opts.nx, opts.ny, opts.nz }; %unused dims;
+
+    if(opts.conv_u16) {
+        if(!opts.labels_file_isset || !opts.init_file_isset || !opts.out_file_isset)
+            FATAL0("missing required file paths for labels, initial solution and output");
+
+        uint8_t *labels = NULL;
+        float *smooth_in = NULL;
+        uint16_t *smooth_out = NULL;
+
+        void *labels_map = NULL;
+        void *smooth_in_map = NULL;
+        void *smooth_out_map = NULL;
+
+        int fd[3] = { -1, -1, -1 };
+        if(loadm == LOAD_MMAP) { // mmap
+            errno = 0;
+            fd[0] = open(opts.labels_file,O_RDONLY);
+            if(fd[0] == -1) ERRFATAL("open[r]","%s",opts.labels_file);
+
+            errno = 0;
+            fd[1] = open(opts.init_file,O_RDONLY);
+            if(fd[1] == -1) ERRFATAL("open[r]","%s",opts.init_file);
+
+            errno = 0;
+            fd[2] = open(opts.out_file,O_RDWR | O_CREAT,CREAT_MASK);
+            if(fd[2] == -1) ERRFATAL("open[rw]","%s",opts.out_file);
+
+            errno = 0;
+            if(ftruncate(fd[2],NVOX * sizeof(*smooth_out)) == -1)
+                ERRFATAL("ftruncate","%zu bytes",NVOX * sizeof(*smooth_out));
+
+            errno = 0;
+            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd[0],0);
+            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
+
+            errno = 0;
+            smooth_in_map = mmap(NULL,NVOX * sizeof(*smooth_in),PROT_READ,MAP_SHARED,fd[1],0);
+            if(MAP_FAILED == smooth_in_map) PERROR("mmap[r]");
+
+            errno = 0;
+            smooth_out_map = mmap(NULL,NVOX * sizeof(*smooth_out),PROT_WRITE,MAP_SHARED,fd[2],0);
+            if(MAP_FAILED == smooth_out_map) PERROR("mmap[w]");
+
+            errno = 0;
+            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            errno = 0;
+            if(madvise(smooth_in_map,NVOX * sizeof(*smooth_in),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            errno = 0;
+            if(madvise(smooth_out_map,NVOX * sizeof(*smooth_out),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            labels = labels_map;
+            smooth_in = smooth_in_map;
+            smooth_out = smooth_out_map;
+        } else {
+            errno = 0;
+            labels = malloc(NVOX * sizeof(*labels));
+            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
+
+            errno = 0;
+            smooth_in = malloc(NVOX * sizeof(*smooth_in));
+            if(NULL == smooth_in) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*smooth_in));
+
+            errno = 0;
+            smooth_out = malloc(NVOX * sizeof(*smooth_out));
+            if(NULL == smooth_out) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*smooth_out));
+
+            if(loadm == LOAD_SEQUENTIAL) {
+                { // load labels
+                    errno = 0;
+                    FILE *fp = fopen(opts.labels_file,"rb");
+                    if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.labels_file);
+                    if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX)
+                        FATAL("fread failed: %zu items",NVOX);
+                    fclose(fp);
+                }
+                { // load smooth_in
+                    errno = 0;
+                    FILE *fp = fopen(opts.init_file,"rb");
+                    if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.init_file);
+                    if(fread(smooth_in,sizeof(*smooth_in),NVOX,fp) != NVOX)
+                        FATAL("fread failed: %zu items",NVOX);
+                    fclose(fp);
+                }
+            } else FATAL0("parload unimplemented");
+        }
+
+        // we quantize the [0,1] interval into [0,65533]
+        // we set the outside to 65534 and the WM to 65535
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels,smooth_in) shared(smooth_out,dims,NREGION)
+#endif
+        for(size_t i = 0; i < NVOX; ++i) {
+            if(0 == labels[i]) {
+                smooth_out[i] = U16FACTOR + 1; // 65534 outside
+            } else if(NREGION == labels[i]) {
+                smooth_out[i] = U16FACTOR + 2; // 65535 at WM
+            } else {
+                smooth_out[i] = smooth_in[i] * U16FACTOR; // 0 .. 65533
+            }
+        }
+
+        if(loadm == LOAD_MMAP) { // munmap
+            errno = 0;
+            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
+            errno = 0;
+            if(munmap(smooth_in_map,NVOX * sizeof(*smooth_in)) == -1) PERROR("munmap");
+            errno = 0;
+            if(munmap(smooth_out_map,NVOX * sizeof(*smooth_out)) == -1) PERROR("munmap");
+
+            close(fd[0]);
+            close(fd[1]);
+            close(fd[2]);
+        } else { // write
+            errno = 0;
+            FILE *fp = fopen(opts.out_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.out_file);
+
+            if(savem == SAVE_PARALLEL) {
+                int fd = fileno(fp);
+                size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:nerr)
+#endif
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*smooth_out);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pwrite(fd,&smooth_out[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pwrite failed: %zu times with %zu items",nerr,NVOX);
+            } else {
+                if(fwrite(smooth_out,sizeof(*smooth_out),NVOX,fp) != NVOX)
+                    FATAL("fwrite failed: %zu items",NVOX);
+            }
+
+            fclose(fp);
+
+            free(labels);
+            free(smooth_in);
+            free(smooth_out);
+        }
+
+        return 0;
+    }
+
+    if(opts.conv_f32) {
+        if(!opts.labels_file_isset || !opts.init_file_isset || !opts.out_file_isset)
+            FATAL0("missing required file paths for labels, initial solution and output");
+
+        uint8_t *labels = NULL;
+        uint16_t *smooth_in = NULL;
+        float *smooth_out = NULL;
+
+        void *labels_map = NULL;
+        void *smooth_in_map = NULL;
+        void *smooth_out_map = NULL;
+
+        int fd[3] = { -1, -1, -1 };
+        if(loadm == LOAD_MMAP) { // mmap
+            errno = 0;
+            fd[0] = open(opts.labels_file,O_RDONLY);
+            if(fd[0] == -1) ERRFATAL("open[r]","%s",opts.labels_file);
+
+            errno = 0;
+            fd[1] = open(opts.init_file,O_RDONLY);
+            if(fd[1] == -1) ERRFATAL("open[r]","%s",opts.init_file);
+
+            errno = 0;
+            fd[2] = open(opts.out_file,O_RDWR | O_CREAT,CREAT_MASK);
+            if(fd[2] == -1) ERRFATAL("open[rw]","%s",opts.out_file);
+
+            errno = 0;
+            if(ftruncate(fd[2],NVOX * sizeof(*smooth_out)) == -1)
+                ERRFATAL("ftruncate","%zu bytes",NVOX * sizeof(*smooth_out));
+
+            errno = 0;
+            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd[0],0);
+            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
+
+            errno = 0;
+            smooth_in_map = mmap(NULL,NVOX * sizeof(*smooth_in),PROT_READ,MAP_SHARED,fd[1],0);
+            if(MAP_FAILED == smooth_in_map) PERROR("mmap[r]");
+
+            errno = 0;
+            smooth_out_map = mmap(NULL,NVOX * sizeof(*smooth_out),PROT_WRITE,MAP_SHARED,fd[2],0);
+            if(MAP_FAILED == smooth_out_map) PERROR("mmap[w]");
+
+            errno = 0;
+            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            errno = 0;
+            if(madvise(smooth_in_map,NVOX * sizeof(*smooth_in),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            errno = 0;
+            if(madvise(smooth_out_map,NVOX * sizeof(*smooth_out),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            labels = labels_map;
+            smooth_in = smooth_in_map;
+            smooth_out = smooth_out_map;
+        } else {
+            errno = 0;
+            labels = malloc(NVOX * sizeof(*labels));
+            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
+
+            errno = 0;
+            smooth_in = malloc(NVOX * sizeof(*smooth_in));
+            if(NULL == smooth_in) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*smooth_in));
+
+            errno = 0;
+            smooth_out = malloc(NVOX * sizeof(*smooth_out));
+            if(NULL == smooth_out) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*smooth_out));
+
+            if(loadm == LOAD_SEQUENTIAL) {
+                { // load labels
+                    errno = 0;
+                    FILE *fp = fopen(opts.labels_file,"rb");
+                    if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.labels_file);
+                    if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX)
+                        FATAL("fread failed: %zu items",NVOX);
+                    fclose(fp);
+                }
+                { // load smooth_in
+                    errno = 0;
+                    FILE *fp = fopen(opts.init_file,"rb");
+                    if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.init_file);
+                    if(fread(smooth_in,sizeof(*smooth_in),NVOX,fp) != NVOX)
+                        FATAL("fread failed: %zu items",NVOX);
+                    fclose(fp);
+                }
+            } else FATAL0("parload unimplemented");
+        }
+
+        // we expand the [0,65533] interval into [0,1]
+        // we set the outside to 2.0 and the WM to -1.0
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels,smooth_in) shared(smooth_out,dims,NREGION)
+#endif
+        for(size_t i = 0; i < NVOX; ++i) {
+            if(0 == labels[i]) {
+                smooth_out[i] = OUT_FLT; // 2.0 outside
+            } else if(NREGION == labels[i]) {
+                smooth_out[i] = WM_FLT; // -1.0 at WM
+            } else {
+                smooth_out[i] = (double)smooth_in[i] / U16FACTOR; // [0,1]
+            }
+        }
+
+        if(loadm == LOAD_MMAP) { // munmap
+            errno = 0;
+            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
+            errno = 0;
+            if(munmap(smooth_in_map,NVOX * sizeof(*smooth_in)) == -1) PERROR("munmap");
+            errno = 0;
+            if(munmap(smooth_out_map,NVOX * sizeof(*smooth_out)) == -1) PERROR("munmap");
+
+            close(fd[0]);
+            close(fd[1]);
+            close(fd[2]);
+        } else { // write
+            errno = 0;
+            FILE *fp = fopen(opts.out_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.out_file);
+
+            if(savem == SAVE_PARALLEL) {
+                int fd = fileno(fp);
+                size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:nerr)
+#endif
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*smooth_out);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pwrite(fd,&smooth_out[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pwrite failed: %zu times with %zu items",nerr,NVOX);
+            } else {
+                if(fwrite(smooth_out,sizeof(*smooth_out),NVOX,fp) != NVOX)
+                    FATAL("fwrite failed: %zu items",NVOX);
+            }
+
+            fclose(fp);
+
+            free(labels);
+            free(smooth_in);
+            free(smooth_out);
+        }
+
+        return 0;
+    }
+
+    if(opts.get_mask) {
+        if(!opts.labels_file_isset || !opts.mask_file_isset || !opts.nmask_file_isset)
+            FATAL0("missing required file paths for input: labels, and outputs: mask and mask sizes");
+
+        uint8_t *labels = NULL;
+
+        errno = 0;
+        int fd = open(opts.labels_file,O_RDONLY);
+        if(fd == -1) ERRFATAL("open[r]","%s",opts.labels_file);
+
+        void *labels_map = NULL;
+        if(loadm == LOAD_MMAP) { // mmap
+            errno = 0;
+            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd,0);
+            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
+
+            errno = 0;
+            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            labels = labels_map;
+        } else { // read
+            errno = 0;
+            labels = malloc(NVOX * sizeof(*labels));
+            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
+            if(loadm == LOAD_PARALLEL) {
+                size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(fd,labels) reduction(+:nerr) shared(dims)
+#endif
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*labels);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pread(fd,&labels[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
+                close(fd);
+            } else {
+                FILE *fp = fdopen(fd,"rb");
+                if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
+                fclose(fp);
+            }
+        }
+
+        uint64_t nmask[NZ];
+        memset(nmask,0x0,NZ * sizeof(*nmask));
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels) reduction(+:nmask[:NZ]) shared(dims)
+#endif
+        for(size_t i = 0; i < NVOX; ++i)
+            nmask[i / NXY] += INMASK_LABEL(labels[i]);
+
+        size_t ntot = 0;
+        size_t mask_off[NZ];
+        for(size_t i = 0; i < NZ; ++i) {
+            mask_off[i] = ntot;
+            ntot += nmask[i];
+        }
+        if(mask_off[1] != 0 || mask_off[NZ - 1] != ntot)
+            FATAL("malformed mask with size %zu",ntot);
+
+        errno = 0;
+        uint8_t *mask = calloc(ntot,sizeof(*mask));
+        if(NULL == mask) ERRFATAL("calloc","%zu bytes",ntot * sizeof(*mask));
+
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels,mask,mask_off) shared(dims,NREGION)
+#endif
+        for(size_t k = 1; k < NZ - 1; ++k) {
+            uint8_t *slice = &labels[k * NXY];
+            uint8_t *inmask = &mask[mask_off[k]];
+            for(size_t ix = 0, im = 0; ix < NXY; ++ix) {
+                size_t gix = (size_t)ix + k * NXY;
+                uint8_t layer = slice[ix];
+                if(INMASK_LABEL(layer)) { // in mask
+                    uint8_t buf[NHOOD_NEUMANN_N];
+                    get_nhood3d_neumann_u8(gix,labels,dims,buf);
+                    if(layer < NREGION - 1) {
+                        for(size_t i = 0; i < NHOOD_NEUMANN_N; ++i) {
+                            if(buf[i] == layer - 1) { inmask[im] = layer; break; } // L* top
+                        }
+                    } else if(layer == NREGION - 1) {
+                        for(size_t i = 0; i < NHOOD_NEUMANN_N; ++i) {
+                            if(buf[i] == layer - 1) { inmask[im] = layer; break; } // L6 top
+                            if(buf[i] == NREGION) { inmask[im] = NREGION; break; } // L6 bottom = WM
+                        }
+                    }
+                    ++im;
+                }
+            }
+        }
+
+        size_t nbnd[1 + NREGION];
+        memset(nbnd,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
+        for(size_t i = 0; i < ntot; ++i) nbnd[mask[i]]++;
+        info("interior size: %zu",nbnd[0]);
+        info0("boundary sizes:");
+        for(size_t i = 1; i < 1 + NREGION; ++i) printf("    %zu\n",nbnd[i]);
+
+        {
+            errno = 0;
+            FILE *fp = fopen(opts.nmask_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.nmask_file);
+            fwrite(nmask,sizeof(*nmask),NZ,fp);
+            fclose(fp);
+        }
+
+        {
+            errno = 0;
+            FILE *fp = fopen(opts.mask_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.mask_file);
+            fwrite(mask,sizeof(*mask),ntot,fp);
+            fclose(fp);
+        }
+
+        free(mask);
+
+        if(loadm == LOAD_MMAP) { // munmap
+            errno = 0;
+            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
+            close(fd);
+        } else free(labels);
+
+        return 0;
+    }
+
+    struct sigaction act = { 0 };
+    act.sa_handler = terminate_handler;
+    sigaction(SIGINT,&act,NULL);
+
+    if(!opts.init_file_isset || !opts.mask_file_isset || !opts.nmask_file_isset)
+        FATAL0("missing required file paths for initial solution, mask and mask sizes");
+
+    /* load sizes per slice and mask */
+    uint64_t nmask[NZ];
+    {
+        errno = 0;
+        FILE *fp = fopen(opts.nmask_file,"rb");
+        if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.nmask_file);
+        if(fread(nmask,sizeof(*nmask),NZ,fp) != NZ) FATAL("fread failed: %zu items",NZ);
+        fclose(fp);
+    }
+
+    size_t ntot = 0;
+    uint8_t *mask = NULL;
+    uint8_t *maskptr[NZ]; // per-slice pointers
+    data_t *maskvals = NULL;
+    data_t *maskvalsptr[NZ]; // per-slice pointers
+    {
+        size_t mask_off[NZ];
+        for(size_t k = 0; k < NZ; ++k) {
+            mask_off[k] = ntot;
+            ntot += nmask[k];
+        }
+        if(mask_off[0] != 0 || mask_off[NZ - 1] != ntot)
+            FATAL("malformed mask with size %zu",ntot);
+
+        errno = 0;
+        mask = malloc(ntot * sizeof(*mask));
+        if(NULL == mask) ERRFATAL("malloc","%zu bytes",ntot * sizeof(*mask));
+
+        errno = 0;
+        maskvals = calloc(ntot,sizeof(*maskvals));
+        if(NULL == maskvals) ERRFATAL("calloc","%zu bytes",ntot * sizeof(*maskvals));
+
+        maskptr[0] = maskptr[NZ - 1] = NULL;
+        maskvalsptr[0] = maskvalsptr[NZ - 1] = NULL;
+        for(size_t k = 1; k < NZ - 1; ++k) {
+            maskptr[k] = &mask[mask_off[k]];
+            maskvalsptr[k] = &maskvals[mask_off[k]];
+        }
+
+        // load mask
+        if(loadm == LOAD_PARALLEL) {
+            errno = 0;
+            int fd = open(opts.mask_file,O_RDONLY);
+            if(-1 == fd) ERRFATAL("open[r]","%s",opts.mask_file);
+            size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(fd,nmask) reduction(+:nerr) shared(dims,maskptr,mask_off)
+#endif
+            for(size_t k = 1; k < NZ - 1; ++k) {
+                size_t count = nmask[k] * sizeof(*mask);
+                off_t offset = mask_off[k] * sizeof(*mask);
+                ssize_t ret = pread(fd,maskptr[k],count,offset);
+                if(ret == -1 || (size_t)ret != count) ++nerr;
+            }
+            if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,ntot);
+            close(fd);
+        } else {
+            errno = 0;
+            FILE *fp = fopen(opts.mask_file,"rb");
+            if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.mask_file);
+            if(fread(mask,sizeof(*mask),ntot,fp) != ntot) FATAL("fread failed: %zu items",ntot);
+            fclose(fp);
+        }
+    }
+
+    size_t nbnd[1 + NREGION];
+    memset(nbnd,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(ntot,mask) reduction(+:nbnd[:1 + NREGION])
+#endif
+    for(size_t i = 0; i < ntot; ++i)
+        nbnd[mask[i]]++;
+
+    info("loaded mask with %zu voxels",ntot);
+    info("interior size: %zu",nbnd[0]);
+    info0("boundary sizes:");
+    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %zu",nbnd[i]);
+
+    int fdmap = -1;
+    data_t *res = NULL;
+    void *res_map = NULL;
+
+    // load initial solution
+    if(loadm == LOAD_MMAP) { // mmap
+        errno = 0;
+        fdmap = open(opts.init_file,O_RDWR | O_DSYNC);
+        if(-1 == fdmap) ERRFATAL("open[rw]","%s",opts.init_file);
+
+        errno = 0;
+        res_map = mmap(NULL,NVOX * sizeof(*res),PROT_READ | PROT_WRITE,MAP_SHARED | MAP_NORESERVE,fdmap,0);
+        if(MAP_FAILED == res_map) ERRFATAL("mmap[rw]","%s",opts.init_file);
+
+        if(madvise(res_map,NVOX * sizeof(*res),MADV_RANDOM) == -1) PERROR("madvise");
+
+        res = res_map;
+    } else {
+        errno = 0;
+        res = malloc(NVOX * sizeof(*res));
+        if(NULL == res) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*res));
+        if(loadm == LOAD_PARALLEL) {
+            errno = 0;
+            int fd = open(opts.init_file,O_RDONLY);
+            if(-1 == fd) ERRFATAL("open[r]","%s",opts.init_file);
+            size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:nerr) shared(dims)
+#endif
+            for(size_t i = 0; i < NZ; ++i) {
+                size_t count = NXY * sizeof(*res);
+                off_t offset = (off_t)i * count;
+                ssize_t ret = pread(fd,&res[i * NXY],count,offset);
+                if(ret == -1 || (size_t)ret != count) ++nerr;
+            }
+            if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
+            close(fd);
+        } else {
+            errno = 0;
+            FILE *fp = fopen(opts.init_file,"rb");
+            if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.init_file);
+            if(fread(res,sizeof(*res),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
+            fclose(fp);
+        }
+    }
+
+    info("loaded initial solution with size %zux%zux%zu (%zu voxels)",NX,NY,NZ,NVOX);
+    warn0("beware of in-file data ordering, NZ must be number of slices");
+
+    size_t slice_rle_n[NZ]; memset(slice_rle_n,0x0,NZ * sizeof(*slice_rle_n));
+    uint32_t *slice_rle_start[NZ];
+    uint32_t *slice_rle_end[NZ];
+
+    { // check mask sizes and compute slice RLE
+        uint64_t ninmask[NZ]; memset(ninmask,0x0,NZ * sizeof(*ninmask));
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(res) shared(ninmask,slice_rle_n,dims) schedule(dynamic)
+#endif
+        for(size_t k = 1; k < NZ - 1; ++k) {
+            data_t *slice = &res[k * NXY];
+            for(size_t ix = 0, rlen = 0; ix < NXY; ++ix) {
+                if(INMASK(slice[ix])) {
+                    ninmask[k]++;
+                    if(rlen == 0) { ++rlen; slice_rle_n[k]++; } // range start
+                } else if(rlen > 0) rlen = 0;
+            }
+        }
+        for(size_t k = 1; k < NZ - 1; ++k) {
+            slice_rle_start[k] = malloc(slice_rle_n[k] * sizeof(**slice_rle_start));
+            slice_rle_end[k] = malloc(slice_rle_n[k] * sizeof(**slice_rle_end));
+        }
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(res) shared(slice_rle_start,slice_rle_end,dims) schedule(dynamic)
+#endif
+        for(size_t k = 1; k < NZ - 1; ++k) {
+            data_t *slice = &res[k * NXY];
+            for(size_t ix = 0, rlen = 0, ir = 0; ix < NXY; ++ix) {
+                if(INMASK(slice[ix])) {
+                    if(rlen == 0) { ++rlen; slice_rle_start[k][ir++] = ix; } // first index in range
+                } else if(rlen > 0) {
+                    slice_rle_end[k][ir - 1] = ix - 1; // last index in range (inclusive)
+                    rlen = 0;
+                }
+            }
+        }
+#if DEBUG
+        for(size_t k = 1; k < NZ - 1; ++k) {
+            printf("%zu\n",k);
+            for(size_t i = 0; i < slice_rle_n[k]; ++i) {
+                printf("%"PRIu32"..%"PRIu32", len=%"PRIu16"\n",
+                    slice_rle_start[k][i],slice_rle_end[k][i],
+                    (uint16_t)(slice_rle_end[k][i] - slice_rle_start[k][i]) + 1);
+            }
+        }
+#endif
+#if DEBUG
+        for(size_t k = 0; k < NZ; ++k) {
+            fprintf(stderr,"%"PRIu64" == %"PRIu64"; %zu ranges\n",
+                    ninmask[k],nmask[k],slice_rle_n[k]);
+        }
+#endif
+        if(memcmp(ninmask,nmask,NZ * sizeof(*nmask)) != 0)
+            FATAL0("input does not match mask");
+    }
+
+    data_t bnd_vals[1 + NREGION];
+    bnd_vals[0] = 0;
+
+    if(opts.bnd_file_isset) { // read boundary values
+        errno = 0;
+        FILE *fp = fopen(opts.bnd_file,"rb");
+        if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.bnd_file);
+        if(fread(&bnd_vals[1],sizeof(*bnd_vals),NREGION,fp) != NREGION)
+            FATAL("fread failed: %zu items",(size_t)NREGION);
+        fclose(fp);
+    } else if(opts.bnd_vals_isset) {
+        char *rtxt = opts.bnd_vals;
+        size_t nval = 0;
+        data_t val;
+        do {
+            char *comma = strchr(rtxt,',');
+            if(NULL != comma) *comma++ = '\0';
+#if U16DATA
+            if(strtou16_check(rtxt,&val))
+                FATAL("failed integer conversion: %s",rtxt);
+#elif FLTDATA
+            if(strtof_check(rtxt,&val))
+                FATAL("failed floating-point conversion: %s",rtxt);
+#endif
+            rtxt = comma;
+            bnd_vals[++nval] = val;
+        } while(NULL != rtxt && nval < NREGION);
+        if(nval != NREGION) FATAL("expected %zu initial boundary values, got %zu",NREGION,nval);
+    } else { // init boundaries to uniform layer depths
+#if U16DATA
+        for(size_t i = 0; i < NREGION; ++i)
+            bnd_vals[1 + i] = ((NREGION - 1 - i) / (float)(NREGION - 1)) * U16FACTOR;
+#elif FLTDATA
+        for(size_t i = 0; i < NREGION; ++i)
+            bnd_vals[1 + i] = ((NREGION - 1 - i) / (float)(NREGION - 1));
+#endif
+    }
+
+    PRINTBND("initial boundary values: ");
+    %recall delineate_boundaries
+
+    info("start iteration up to %zu",opts.iter_max);
+    info("updating boundary values at relative delta %g, convergence at absolute delta %g",
+         opts.delta_bnd,opts.delta_tol);
+
+    double diff = 0.0;
+    double delta = 0.0;
+    double delta_rel = 0.0;
+    double bnd_diff = 0.0;
+    double bnd_delta = 0.0;
+    double bnd_delta_rel = 0.0;
+    for(size_t iter = 1; iter <= opts.iter_max && keepRunning; ++iter) {
+        struct timespec ts_begin, ts_end;
+        clock_gettime(CLOCK_MONOTONIC,&ts_begin);
+        delta = diff;
+        diff = 0.0;
+
+#ifdef _OPENMP
+#pragma omp parallel default(none) firstprivate(res,maskptr,maskvalsptr) shared(diff,slice_rle_n,slice_rle_start,slice_rle_end,dims)
+    {
+#endif
+        %recall smoothen_and_delta
+        %recall writeback_to_array
+#ifdef _OPENMP
+    }
+#endif
+
+        diff /= ntot;
+        delta = fabs(diff - delta);
+        delta_rel = delta / diff;
+
+        if(delta_rel < opts.delta_bnd) { // update boundary values for smoothness
+            double bnd_mean[1 + NREGION];
+            memset(bnd_mean,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
+            bnd_delta = bnd_diff;
+            bnd_diff = 0.0;
+
+#ifdef _OPENMP
+#pragma omp parallel default(none) firstprivate(res,mask,maskvals,maskptr,maskvalsptr) shared(slice_rle_n,slice_rle_start,slice_rle_end,dims,bnd_mean,ntot,NREGION)
+    {
+#endif
+        %recall smoothen (`msk > 1 && msk < NREGION`)
+
+#ifdef _OPENMP
+#pragma omp for reduction(+:bnd_mean[:1 + NREGION]) schedule(static)
+#endif
+            for(size_t i = 0; i < ntot; ++i)
+                bnd_mean[mask[i]] += TOFLOAT(maskvals[i]);
+#ifdef _OPENMP
+    }
+#endif
+
+            for(size_t i = 2; i < NREGION; ++i) { // except L1 and WM boundaries
+                bnd_mean[i] /= nbnd[i];
+                bnd_diff += fabs(bnd_mean[i] - TOFLOAT(bnd_vals[i]));
+                bnd_vals[i] = FROMFLOAT(bnd_mean[i]);
+            }
+            bnd_diff /= NREGION - 2;
+            bnd_delta = fabs(bnd_diff - bnd_delta);
+            bnd_delta_rel = bnd_delta / bnd_diff;
+
+            PRINTBND("updated boundary values: ");
+            %recall delineate_boundaries
+        }
+
+        clock_gettime(CLOCK_MONOTONIC,&ts_end);
+
+        long msec_begin = ts_begin.tv_sec * 1000 + ts_begin.tv_nsec / 1000000L;
+        long msec_end = ts_end.tv_sec * 1000 + ts_end.tv_nsec / 1000000L;
+
+        info("iteration %zu done in %gs, diff = %g (%g), bnd_diff = %g (%g)",
+             iter,(msec_end - msec_begin) / 1000.0,diff,delta_rel,bnd_diff,bnd_delta_rel);
+
+        if(bnd_delta > 0 &&
+            delta < opts.delta_tol && bnd_delta < opts.delta_tol) {
+            info0("converged!");
+            break;
+        }
+    }
+
+    { // final boundary smoothing
+#ifdef _OPENMP
+#pragma omp parallel default(none) firstprivate(res,maskptr,maskvalsptr,NREGION) shared(diff,slice_rle_n,slice_rle_start,slice_rle_end,dims)
+    {
+#endif
+        %recall smoothen (`msk > 1 && msk < NREGION`)
+        %recall writeback_to_array (`msk > 1 && msk < NREGION`)
+#ifdef _OPENMP
+    }
+#endif
+    }
+
+    PRINTBND("final boundary values: ");
+    { // write final boundary values
+        char path[PATH_MAX]; snprintf(path,sizeof(path),"%s.bnd",opts.out_file);
+        info("writing final boundary values to %s",path);
+        errno = 0;
+        FILE *fp = fopen(path,"wb");
+        if(fp == NULL) ERRFATAL("fopen[w]","%s",path);
+        if(fwrite(&bnd_vals[1],sizeof(*bnd_vals),NREGION,fp) != NREGION)
+            error("fwrite failed: %zu items",(size_t)NREGION);
+        fclose(fp);
+    }
+
+    bool couldsave = false;
+    info("writing final solution to %s",opts.out_file);
+    // write final solution
+    for(size_t try = 1; !couldsave && try <= MAX_RETRY_SAVE; ++try) {
+        if(savem == SAVE_PARALLEL) {
+            errno = 0;
+            int fd = creat(opts.out_file,CREAT_MASK);
+            if(-1 == fd) {
+                error("creat failed: %s, retrying in 5 minutes",opts.out_file);
+                goto loop;
+            }
+            size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+:nerr)
+#endif
+            for(size_t i = 0; i < NZ; ++i) {
+                size_t count = NXY * sizeof(*res);
+                off_t offset = (off_t)i * count;
+                ssize_t ret = pwrite(fd,&res[i * NXY],count,offset);
+                if(ret == -1 || (size_t)ret != count) ++nerr;
+            }
+            if(nerr > 0)
+                error("pwrite failed: %zu times with %zu items, retrying in 5 minutes",nerr,NVOX);
+            else couldsave = true;
+            close(fd);
+        } else {
+            errno = 0;
+            FILE *fp = fopen(opts.out_file,"wb");
+            if(NULL == fp) {
+                error("fopen[w] failed: %s, retrying in 5 minutes",opts.out_file);
+                goto loop;
+            }
+            if(fwrite(res,sizeof(*res),NVOX,fp) != NVOX)
+                error("fwrite failed: %zu items, retrying in 5 minutes",NVOX);
+            else couldsave = true;
+            fclose(fp);
+        }
+loop:
+        if(!couldsave) sleep(300);
+        if(try > 10) savem = SAVE_SEQUENTIAL; // fallback to sequential
+    }
+
+    /* cleanup */
+    if(loadm == LOAD_MMAP) { // munmap
+        errno = 0;
+        if(munmap(res_map,NVOX * sizeof(*res)) == -1) PERROR("munmap");
+        close(fdmap);
+    } else %free(res);
+    %free(maskvals);
+    %free(mask);
+
+    for(size_t k = 1; k < NZ - 1; ++k) {
+        free(slice_rle_start[k]);
+        free(slice_rle_end[k]);
+    }
+
+    return !couldsave;
+}
