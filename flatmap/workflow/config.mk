@@ -6,6 +6,10 @@ ifndef USER_DATA_ROOT
 $(error Please set USER_DATA_ROOT to absolute path of user data)
 endif
 
+ifeq (,$(wildcard $(USER_DATA_ROOT)/config.mk))
+$(error User configuration file not present at $$USER_DATA_ROOT/config.mk)
+endif
+
 SOURCE_CODE_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/code
 WORKFLOW_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/workflow
 

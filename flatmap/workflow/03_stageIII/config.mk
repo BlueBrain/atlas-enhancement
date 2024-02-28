@@ -4,3 +4,5 @@ STAGE_ROOT := $(STAGE_III_ROOT)
 STEPS := 01_nearest\
 		 02_flatmap\
 		 03_discretization
+
+DEFAULT_STEPS := $(STEPS)

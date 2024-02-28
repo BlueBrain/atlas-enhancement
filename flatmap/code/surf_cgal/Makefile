@@ -1,7 +1,7 @@
 -include config.mk
 
 ifndef CGAL_ROOT
-$(error Please set CGAL_ROOT)
+$(error Please set CGAL_ROOT to the location of CGAL source code)
 endif
 
 .PHONY: compile compile-mkl

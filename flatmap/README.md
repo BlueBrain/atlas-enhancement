@@ -9,7 +9,12 @@ Contents:
 + `surf_cgal`: C++ code for CGAL-powered code to work with meshes.
 + `utils`: mostly Python scripts and two AWK helper scripts to perform various tasks.
 
-To compile, gather dependencies, change directory to `code` and run `make`!
+To compile:
+
+1. Gather dependencies (listed below).
+2. Change directory to `code`.
+3. Set environment variable `CGAL_ROOT` to the location of CGAL source code.
+4. Run `make`!
 
 ## Workflow
 
@@ -29,8 +34,8 @@ To create a flatmap:
 2. Clone this repository.
 3. Compile the code as explained above.
 4. Setup a Python environment using the provided `requirements.txt` file and activate it.
-5. Set the environment variable `ATLAS_ENHANCEMENT_ROOT` to the absolute path of the local clone of this repository.
-6. Set the environment variable `USER_DATA_ROOT` to the absolute path of the directory containing the input files.
+5. Set the environment variable `ATLAS_ENHANCEMENT_ROOT` to the location of the local clone of this repository.
+6. Set the environment variable `USER_DATA_ROOT` to the location of the directory containing the input files.
 7. Change directory to `$ATLAS_ENHANCEMENT_ROOT/flatmap/workflow`.
 8. Run `make`!
 
