@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include <signal.h>
 #include <unistd.h>
@@ -37,6 +38,10 @@ static void terminate_handler(int sig) {
     write(STDERR_FILENO,TERMINATE_MSG,strlen(TERMINATE_MSG));
 }
 
+static void alarm_handler(int sig) {
+    (void)sig;
+}
+
 #define CREAT_MASK (S_IRUSR | S_IWUSR | S_IRGRP)
 #define MAX_RETRY_SAVE 100
 
@@ -44,6 +49,45 @@ static void terminate_handler(int sig) {
 #define PERROR(FUN) ERRFATAL(FUN,"at line %d",__LINE__)
 #define FATAL(M,...) { error(M,__VA_ARGS__); exit(EXIT_FAILURE); }
 #define FATAL0(M) { error0(M); exit(EXIT_FAILURE); }
+
+#define U16FACTOR (UINT16_MAX - 2)
+#define OUT_U16 (U16FACTOR + 1)
+#define WM_U16 (U16FACTOR + 2)
+#define OUT_FLT (2.0)
+#define WM_FLT (-1.0)
+
+#ifndef U16DATA
+#define U16DATA 0
+#endif
+
+#ifndef FLTDATA
+#define FLTDATA 1
+#endif
+
+#define INBND(msk) ((msk) > 0)
+#define INMASK_LABEL(x) ((x) >= 1 && (x) < NREGION)
+
+#if U16DATA
+typedef uint16_t data_t;
+#define PRIdata PRIu16
+#define TYPESTR "uint16"
+#define INMASK(x) ((x) <= U16FACTOR)
+#define TOFLOAT(x) ((double)(x) / U16FACTOR)
+#define FROMFLOAT(x) ((x) * U16FACTOR)
+#define PRINTBND(M) \
+    info0(M); \
+    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %"PRIdata" (%g)",bnd_vals[i],TOFLOAT(bnd_vals[i]));
+#elif FLTDATA
+typedef float data_t;
+#define PRIdata "g"
+#define TYPESTR "float32"
+#define INMASK(x) ((x) > WM_FLT && (x) < OUT_FLT)
+#define TOFLOAT(x) (x)
+#define FROMFLOAT(x) (x)
+#define PRINTBND(M) \
+    info0(M); \
+    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %"PRIdata,bnd_vals[i]);
+#endif
 
 
 #include <stdio.h>
@@ -128,13 +172,13 @@ static void terminate_handler(int sig) {
 
 
 
-void print_usage(void) {
-    printf("lapgasm3d_full: heat equation approximation through iterative gaussian smoothing in 3D (full version)\n");
+static void print_usage(void) {
+    puts("lapgasm3d_full: heat equation approximation through iterative gaussian smoothing in 3D (full version)");
         
     {
     printf("Available parameters: (* = required) (+ = multiple) [default]\n");
 
-    const int maxlen = 11;
+    const int maxlen = 12;
     (void)maxlen;
 
     
@@ -175,16 +219,28 @@ void print_usage(void) {
                "relative delta tolerance for boundary update",
                " [""1E-6""]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
+               "      ",'E',maxlen,"extract-mask",
+               "     ",
+               "  ",
+               "extract mask from labels file (int8)",
+               " [""false""]");
+           printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
+               "      ",'f',maxlen,"force-bnd",
+               "     ",
+               "  ",
+               "force initial boundary values",
+               " [""false""]");
+           printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'G',maxlen,"get-mask",
                "     ",
                "  ",
-               "generate mask from input file",
+               "generate mask from labels file (uint8)",
                " [""false""]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'i',maxlen,"initial",
                "<arg>",
                "  ",
-               "file with initial solution",
+               "file with initial solution (" TYPESTR ")",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'n',maxlen,"itermax",
@@ -196,7 +252,7 @@ void print_usage(void) {
                "      ",'l',maxlen,"labels",
                "<arg>",
                "  ",
-               "file with labels (uint8)",
+               "file with labels ((u)int8)",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'m',maxlen,"mask",
@@ -205,7 +261,7 @@ void print_usage(void) {
                "file with mask (uint8)",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'M',maxlen,"mask-nums",
+               "      ",'M',maxlen,"mask-sizes",
                "<arg>",
                "  ",
                "file with per-slice mask sizes (uint64)",
@@ -215,13 +271,13 @@ void print_usage(void) {
                "<arg>",
                "  ",
                "output file",
-               " [""stdout""]");
+               "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'r',maxlen,"regions",
                "<arg>",
-               "  ",
+               "* ",
                "number of regions",
-               " [""7""]");
+               " [""0""]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'x',maxlen,"xdim",
                "<arg>",
@@ -243,6 +299,12 @@ void print_usage(void) {
    
     
                 printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
+            ,"      "
+            
+            ,maxlen,"docs"
+            ,"     "
+            ,"  ","print documentation","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
             ,"      "
             
             ,maxlen,"help"
@@ -291,6 +353,19 @@ void print_usage(void) {
             ,"     "
             ,"  ","print diagnostic messages","");
    }
+}
+
+
+static void print_docs(void) {
+    puts("lapgasm3d_full: heat equation approximation through iterative gaussian smoothing in 3D (full version)");
+    puts("Features:\n"
+"   + Low memory footprint: mmap-ed inputs, sparse spatial locations\n"
+"   + Fast: RLE of masked values, parallel save\n"
+"\n"
+"Input formats:\n"
+"   + Labels is a uint8 file with 0 for outside, and increasing numbers for layers, up to (and including) WM\n"
+"   + Initial solution is a float32 file with 2.0 for outside, -1.0 for WM, and values [0,1] for layers\n"
+);
 }
 
 
@@ -527,43 +602,11 @@ __attribute__ ((unused))
     return 0;
 }
 
-/* regions are: 6 cortical layers + WM */
-#define U16FACTOR (UINT16_MAX - 2)
-#define OUT_FLT (2.0)
-#define WM_FLT (-1.0)
-
-#define U16DATA 1
-#define FLTDATA 0
-
-#define INBND(msk) ((msk) > 0)
-#define INMASK_LABEL(x) ((x) >= 1 && (x) <= 6)
-
-#if U16DATA
-typedef uint16_t data_t;
-#define PRIdata PRIu16
-#define INMASK(x) ((x) <= U16FACTOR)
-#define TOFLOAT(x) ((double)(x) / U16FACTOR)
-#define FROMFLOAT(x) ((x) * U16FACTOR)
-#define PRINTBND(M) \
-    info0(M); \
-    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %"PRIdata" (%g)",bnd_vals[i],TOFLOAT(bnd_vals[i]));
-#elif FLTDATA
-typedef float data_t;
-#define PRIdata "g"
-#define INMASK(x) ((x) >= WM_FLT && (x) <= OUT_FLT)
-#define TOFLOAT(x) (x)
-#define FROMFLOAT(x) (x)
-#define PRINTBND(M) \
-    info0(M); \
-    for(size_t i = 1; i < 1 + NREGION; ++i) info("    %"PRIdata,bnd_vals[i]);
-#endif
-
 #define NX (dims.nx)
 #define NY (dims.ny)
 #define NZ (dims.nz)
 #define NXY (NX * NY)
 #define NVOX (NXY * NZ)
-
 struct _dims {
     size_t nx;
     size_t ny;
@@ -571,44 +614,33 @@ struct _dims {
 };
 
 #define NHOOD_NEUMANN_N 7
-
-inline static void get_nhood3d_neumann(size_t ix, const data_t *restrict array, struct _dims dims, data_t buf[restrict static NHOOD_NEUMANN_N]) {
-    buf[0] = array[(int64_t)ix - NXY];
-    buf[1] = array[(int64_t)ix - NX];
-    buf[2] = array[(int64_t)ix - 1];
-    buf[3] = array[(int64_t)ix];
-    buf[4] = array[(int64_t)ix + 1];
-    buf[5] = array[(int64_t)ix + NX];
-    buf[6] = array[(int64_t)ix + NXY];
-}
-
-inline static void get_nhood3d_neumann_u8(size_t ix, const uint8_t *restrict array, struct _dims dims, uint8_t buf[restrict static NHOOD_NEUMANN_N]) {
-    buf[0] = array[(int64_t)ix - NXY];
-    buf[1] = array[(int64_t)ix - NX];
-    buf[2] = array[(int64_t)ix - 1];
-    buf[3] = array[(int64_t)ix];
-    buf[4] = array[(int64_t)ix + 1];
-    buf[5] = array[(int64_t)ix + NX];
-    buf[6] = array[(int64_t)ix + NXY];
-}
-
-/* gaussian kernel (at approx 1.889 std devs) */
-#define KERNEL_SIZE 3
-#define KERNEL_HSIZE 1
 #define KERNEL_VSIZE NHOOD_NEUMANN_N
+
+/* 3D gaussian kernel (at approx 1.889 std devs) */
+
+/* 3D von Neumann neighborhood */
+inline static void get_nhood3d_neumann(size_t ix, const data_t *restrict array, struct _dims dims, data_t buf[restrict static KERNEL_VSIZE]) {
+    buf[0] = array[ix + (int64_t)(-NXY)];
+    buf[1] = array[ix + (int64_t)(-NX)];
+    buf[2] = array[ix + (int64_t)(-1)];
+    buf[3] = array[ix + (int64_t)(1)];
+    buf[4] = array[ix + (int64_t)(NX)];
+    buf[5] = array[ix + (int64_t)(NXY)];
+    buf[6] = array[ix + (int64_t)(0)];
+}
+
+inline static void get_nhood3d_neumann_u8(size_t ix, const uint8_t *restrict array, struct _dims dims, uint8_t buf[restrict static KERNEL_VSIZE]) {
+    buf[0] = array[ix + (int64_t)(-NXY)];
+    buf[1] = array[ix + (int64_t)(-NX)];
+    buf[2] = array[ix + (int64_t)(-1)];
+    buf[3] = array[ix + (int64_t)(1)];
+    buf[4] = array[ix + (int64_t)(NX)];
+    buf[5] = array[ix + (int64_t)(NXY)];
+    buf[6] = array[ix + (int64_t)(0)];
+}
+
 static const double kernel[KERNEL_VSIZE] = {
-
-            0x1p-3,
-
-
-            0x1p-3,
-    0x1p-3, 0x1p-2, 0x1p-3,
-            0x1p-3,
-
-
-            0x1p-3
-
-};
+0x1p-3,0x1p-3,0x1p-3,0x1p-3,0x1p-3,0x1p-3,0x1p-2};
 
 inline static double dotproduct(const double a[restrict static KERNEL_VSIZE], const double b[restrict static KERNEL_VSIZE]) {
     double sum = 0.0;
@@ -618,14 +650,21 @@ inline static double dotproduct(const double a[restrict static KERNEL_VSIZE], co
 }
 
 inline static double convolve(struct _dims dims, const data_t *restrict res, size_t gix) {
-    double sum = 0.0;
     data_t nhood[KERNEL_VSIZE];
-    double buf[KERNEL_VSIZE];
-
     get_nhood3d_neumann(gix,res,dims,nhood);
-    for(int i = 0; i < KERNEL_VSIZE; ++i)
+
+    double buf[KERNEL_VSIZE] = { 0 };
+    double norm = 0.0;
+    /* optimize center voxel */
+    buf[KERNEL_VSIZE - 1] = TOFLOAT(nhood[KERNEL_VSIZE - 1]);
+    norm = kernel[KERNEL_VSIZE - 1];
+    for(int i = 0; i < KERNEL_VSIZE - 1; ++i) { // skip out-of-mask voxels
+        if(!INMASK(nhood[i])) continue;
         buf[i] = TOFLOAT(nhood[i]);
-    sum = dotproduct(buf,kernel); // compute convolution
+        norm += kernel[i];
+    }
+
+    double sum = dotproduct(buf,kernel) / norm; // compute convolution (normalized)
     if(sum > 1.0) sum = 1.0; // clamp hi
     else if(sum < 0.0) sum = 0.0; // clamp lo
 
@@ -640,6 +679,7 @@ inline static double convolve(struct _dims dims, const data_t *restrict res, siz
 int main(int argc, char *argv[]) {
     enum load_mode loadm = LOAD_MMAP;
     enum save_mode savem = SAVE_PARALLEL;
+    int do_print_docs = false;
 
             
         struct {
@@ -648,6 +688,8 @@ int main(int argc, char *argv[]) {
            bool conv_u16; 
            double delta_tol; 
            double delta_bnd; 
+           bool ext_mask; 
+           bool force_bnd; 
            bool conv_f32; 
            bool get_mask; 
            char* init_file; 
@@ -665,6 +707,8 @@ int main(int argc, char *argv[]) {
            bool conv_u16_isset; 
            bool delta_tol_isset; 
            bool delta_bnd_isset; 
+           bool ext_mask_isset; 
+           bool force_bnd_isset; 
            bool conv_f32_isset; 
            bool get_mask_isset; 
            bool init_file_isset; 
@@ -689,6 +733,8 @@ int main(int argc, char *argv[]) {
            opts.conv_u16 = false;
            opts.delta_tol = 1E-9;
            opts.delta_bnd = 1E-6;
+           opts.ext_mask = false;
+           opts.force_bnd = false;
            opts.conv_f32 = false;
            opts.get_mask = false;
                opts.init_file = NULL;
@@ -701,9 +747,8 @@ int main(int argc, char *argv[]) {
     
            opts.iter_max = 1000;
                opts.out_file = NULL;
-        if(       NULL == ((opts.out_file) = strdup("stdout")))        { error0("out of memory"); exit(EXIT_FAILURE); }
-
-           opts.nregion = 7;
+    
+           opts.nregion = 0;
            opts.nx = 6145;
            opts.ny = 4310;
            opts.nz = 7406;
@@ -712,13 +757,13 @@ int main(int argc, char *argv[]) {
     
     
     
-                                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                                                           
     if(argc == 1) { // no arguments at all
                 
     {
     printf("Available parameters: (* = required) (+ = multiple) [default]\n");
 
-    const int maxlen = 11;
+    const int maxlen = 12;
     (void)maxlen;
 
     
@@ -759,16 +804,28 @@ int main(int argc, char *argv[]) {
                "relative delta tolerance for boundary update",
                " [""1E-6""]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
+               "      ",'E',maxlen,"extract-mask",
+               "     ",
+               "  ",
+               "extract mask from labels file (int8)",
+               " [""false""]");
+           printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
+               "      ",'f',maxlen,"force-bnd",
+               "     ",
+               "  ",
+               "force initial boundary values",
+               " [""false""]");
+           printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'G',maxlen,"get-mask",
                "     ",
                "  ",
-               "generate mask from input file",
+               "generate mask from labels file (uint8)",
                " [""false""]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'i',maxlen,"initial",
                "<arg>",
                "  ",
-               "file with initial solution",
+               "file with initial solution (" TYPESTR ")",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'n',maxlen,"itermax",
@@ -780,7 +837,7 @@ int main(int argc, char *argv[]) {
                "      ",'l',maxlen,"labels",
                "<arg>",
                "  ",
-               "file with labels (uint8)",
+               "file with labels ((u)int8)",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'m',maxlen,"mask",
@@ -789,7 +846,7 @@ int main(int argc, char *argv[]) {
                "file with mask (uint8)",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'M',maxlen,"mask-nums",
+               "      ",'M',maxlen,"mask-sizes",
                "<arg>",
                "  ",
                "file with per-slice mask sizes (uint64)",
@@ -799,13 +856,13 @@ int main(int argc, char *argv[]) {
                "<arg>",
                "  ",
                "output file",
-               " [""stdout""]");
+               "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'r',maxlen,"regions",
                "<arg>",
-               "  ",
+               "* ",
                "number of regions",
-               " [""7""]");
+               " [""0""]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
                "      ",'x',maxlen,"xdim",
                "<arg>",
@@ -827,6 +884,12 @@ int main(int argc, char *argv[]) {
    
     
                 printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
+            ,"      "
+            
+            ,maxlen,"docs"
+            ,"     "
+            ,"  ","print documentation","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
             ,"      "
             
             ,maxlen,"help"
@@ -898,6 +961,8 @@ int main(int argc, char *argv[]) {
             { "parsave", no_argument,                NULL,                0 },
                    /* save output sequentially */
             { "seqsave", no_argument,                NULL,                0 },
+                   /* print documentation */
+            { "docs", no_argument,                &do_print_docs,                true },
                            /* boundary values file */
             { "boundaries", required_argument, NULL, 'b' },
                    /* boundary values comma-separated list */
@@ -908,18 +973,22 @@ int main(int argc, char *argv[]) {
             { "delta", required_argument, NULL, 'd' },
                    /* relative delta tolerance for boundary update */
             { "delta-bnd", required_argument, NULL, 'D' },
+                   /* extract mask from labels file (int8) */
+            { "extract-mask", no_argument, NULL, 'E' },
+                   /* force initial boundary values */
+            { "force-bnd", no_argument, NULL, 'f' },
                    /* convert uint16[0,65533] to float[0,1] */
             { "convert-f32", no_argument, NULL, 'F' },
-                   /* generate mask from input file */
+                   /* generate mask from labels file (uint8) */
             { "get-mask", no_argument, NULL, 'G' },
-                   /* file with initial solution */
+                   /* file with initial solution (" TYPESTR ") */
             { "initial", required_argument, NULL, 'i' },
-                   /* file with labels (uint8) */
+                   /* file with labels ((u)int8) */
             { "labels", required_argument, NULL, 'l' },
                    /* file with mask (uint8) */
             { "mask", required_argument, NULL, 'm' },
                    /* file with per-slice mask sizes (uint64) */
-            { "mask-nums", required_argument, NULL, 'M' },
+            { "mask-sizes", required_argument, NULL, 'M' },
                    /* maximum number of iterations */
             { "itermax", required_argument, NULL, 'n' },
                    /* output file */
@@ -936,25 +1005,26 @@ int main(int argc, char *argv[]) {
         };
 
         /* build optstring */
-        const char optstring[] = "b:B:Cd:D:FGi:l:m:M:n:o:r:x:y:z:";
+        const char optstring[] = "b:B:Cd:D:EfFGi:l:m:M:n:o:r:x:y:z:";
 
         int opt, longidx;
         bool getopt_verbose = false; // --verbose passed
-        bool longopt_isset[8] = { 0 };
-        char *longopt_arg[8] = { 0 };
+        bool longopt_isset[9] = { 0 };
+        char *longopt_arg[9] = { 0 };
         (void)longopt_isset;
 (void)longopt_arg;
 
         while((opt = getopt_long(argc,argv,optstring,optlist,&longidx)) != -1) {
             if(opt == 0) { /* long options with no short option */
-                if(longidx < 8)
+                if(longidx < 9)
                     longopt_isset[longidx] = true;
                 if(longidx == 0 || longidx == 1) { // --help or --usage
                         print_usage();
+    exit(EXIT_SUCCESS);
                 } else if(longidx == 2) { // --verbose
                     getopt_verbose = true;
                 } else if(longidx >= 3) {
-                    if(longidx < 8) {
+                    if(longidx < 9) {
                             if(NULL != (optarg) &&       NULL == ((longopt_arg[longidx]) = strdup(optarg)))        { error0("out of memory"); exit(EXIT_FAILURE); }
                     }
 
@@ -976,6 +1046,9 @@ int main(int argc, char *argv[]) {
                             break;
                                            case 4:
                             optlabel = "--seqsave";
+                            break;
+                                           case 5:
+                            optlabel = "--docs";
                             break;
                                        }
 
@@ -1081,6 +1154,30 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
                     break;
+                                   case 'E':
+                        optlabel = "-E/--extract-mask";
+
+                            if(opts.ext_mask_isset) {
+        error("Duplicate option found: %s",optlabel);
+        exit(EXIT_FAILURE);
+    }
+                        opts.ext_mask_isset = true; 
+
+                        /* option default actions, overriden by user-defined actions below */
+                            opts.ext_mask = !false;
+                    break;
+                                   case 'f':
+                        optlabel = "-f/--force-bnd";
+
+                            if(opts.force_bnd_isset) {
+        error("Duplicate option found: %s",optlabel);
+        exit(EXIT_FAILURE);
+    }
+                        opts.force_bnd_isset = true; 
+
+                        /* option default actions, overriden by user-defined actions below */
+                            opts.force_bnd = !false;
+                    break;
                                    case 'F':
                         optlabel = "-F/--convert-f32";
 
@@ -1145,7 +1242,7 @@ int main(int argc, char *argv[]) {
         if(NULL != (optarg) &&       NULL == ((opts.mask_file) = strdup(optarg)))        { error0("out of memory"); exit(EXIT_FAILURE); }
                     break;
                                    case 'M':
-                        optlabel = "-M/--mask-nums";
+                        optlabel = "-M/--mask-sizes";
 
                             if(opts.nmask_file_isset) {
         error("Duplicate option found: %s",optlabel);
@@ -1251,19 +1348,25 @@ int main(int argc, char *argv[]) {
                     switch(opt) {
         case 'd':     if(! (opts.delta_tol > 0) ) { error0("Condition not fulfilled: opts.delta_tol > 0"); exit(EXIT_FAILURE); }
  break;
+        case 'r':     if(! (opts.nregion >= 2) ) { error0("Condition not fulfilled: opts.nregion >= 2"); exit(EXIT_FAILURE); }
+ break;
     }
             }
         }
 
         /* check if required options are present */
-                                                                                                                                                                                                                                                                                                                                           
+                                                                                                                                                                                                                                                                                                                     if(!opts.nregion_isset) {
+        error("Please specify %s: %s","-r/--regions","number of regions");
+        exit(EXIT_FAILURE);
+    }
+                                                                
         /* if verbose, print all option values */
         if(getopt_verbose) {
                     
     {
     verbose0("Parameter summary: --flag <bool> = value .");
 
-    const int maxlen = 11;
+    const int maxlen = 12;
     (void)maxlen;
 
     
@@ -1317,6 +1420,20 @@ int main(int argc, char *argv[]) {
     }
        {
         char buf[1024] = "<non-representable>";
+            (void)snprintf(buf,sizeof(buf),"%s",opts.ext_mask ? "<true>" : "<false>");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
+                ,"      ",'E',maxlen,"extract-mask"
+                ,opts.ext_mask_isset ? "  <set>" : "<unset>","",buf," .");
+    }
+       {
+        char buf[1024] = "<non-representable>";
+            (void)snprintf(buf,sizeof(buf),"%s",opts.force_bnd ? "<true>" : "<false>");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
+                ,"      ",'f',maxlen,"force-bnd"
+                ,opts.force_bnd_isset ? "  <set>" : "<unset>","",buf," .");
+    }
+       {
+        char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.get_mask ? "<true>" : "<false>");
         verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
                 ,"      ",'G',maxlen,"get-mask"
@@ -1366,7 +1483,7 @@ int main(int argc, char *argv[]) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
         verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'M',maxlen,"mask-nums"
+                ,"      ",'M',maxlen,"mask-sizes"
                 ,opts.nmask_file_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
@@ -1410,6 +1527,9 @@ int main(int argc, char *argv[]) {
    
     
                 verbose("%s    --%-*s %s%s " "" " %s%s"
+            ,"      ",maxlen,"docs"
+            ,longopt_isset[8] ? "  <set>" : "<unset>","","","");
+               verbose("%s    --%-*s %s%s " "" " %s%s"
             ,"      ",maxlen,"help"
             ,longopt_isset[0] ? "  <set>" : "<unset>","","","");
                verbose("%s    --%-*s %s%s " "" " %s%s"
@@ -1436,7 +1556,7 @@ int main(int argc, char *argv[]) {
    }
         }
 
-        const size_t len_optab_long = 8;
+        const size_t len_optab_long = 9;
         {
 const size_t _len = len_optab_long;
 for(size_t _idx = 0; _idx < _len; ++_idx) {
@@ -1447,13 +1567,274 @@ const size_t _idx = 0; (void)_idx;
 
         argv[0] = old_argv0;
     }
-    size_t NREGION = opts.nregion; //XXX: making this const results in internal compiler error with GCC 13.1.1
 
-    struct _dims dims = { opts.nx, opts.ny, opts.nz }; (void)dims;
+    size_t NREGION = opts.nregion; //XXX: making this const results in internal compiler error with GCC 13.1.1
+    struct _dims dims = { opts.nx, opts.ny, opts.nz };
+
+    if(do_print_docs) {
+        print_docs();
+        exit(EXIT_SUCCESS);
+    }
+
+    if(opts.get_mask) {
+        if(!opts.labels_file_isset) FATAL0("missing required input labels file");
+        if(!opts.mask_file_isset) FATAL0("missing required output mask file");
+        if(!opts.nmask_file_isset) FATAL0("missing required output mask sizes file");
+
+        uint8_t *labels = NULL;
+
+        errno = 0;
+        int fd = open(opts.labels_file,O_RDONLY);
+        if(fd == -1) ERRFATAL("open[r]","%s",opts.labels_file);
+
+        void *labels_map = NULL;
+        if(loadm == LOAD_MMAP) { // mmap
+            errno = 0;
+            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd,0);
+            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
+
+            errno = 0;
+            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            labels = labels_map;
+        } else { // read
+            errno = 0;
+            labels = malloc(NVOX * sizeof(*labels));
+            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
+            if(loadm == LOAD_PARALLEL) {
+                size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(fd,labels) reduction(+:nerr) shared(dims)
+#endif
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*labels);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pread(fd,&labels[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
+                close(fd);
+            } else {
+                FILE *fp = fdopen(fd,"rb");
+                if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
+                fclose(fp);
+                fd = -1; // invalid from here on
+            }
+        }
+
+        uint64_t nmask[NZ];
+        memset(nmask,0x0,NZ * sizeof(*nmask));
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels) reduction(+:nmask[:NZ]) shared(dims,NREGION)
+#endif
+        for(size_t i = 0; i < NVOX; ++i)
+            nmask[i / NXY] += INMASK_LABEL(labels[i]);
+
+        size_t ntot = 0;
+        size_t mask_off[NZ];
+        for(size_t i = 0; i < NZ; ++i) {
+            mask_off[i] = ntot;
+            ntot += nmask[i];
+        }
+        if(mask_off[1] != 0 || mask_off[NZ - 1] != ntot)
+            FATAL("malformed mask with size %zu",ntot);
+
+        errno = 0;
+        uint8_t *mask = calloc(ntot,sizeof(*mask)); // init to zero (interior)
+        if(NULL == mask) ERRFATAL("calloc","%zu bytes",ntot * sizeof(*mask));
+
+        { // get mask
+            size_t nbad = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels,mask,mask_off) shared(dims,NREGION) reduction(+:nbad)
+#endif
+            for(size_t k = 1; k < NZ - 1; ++k) {
+                const uint8_t *slice = &labels[k * NXY];
+                uint8_t *inmask = &mask[mask_off[k]];
+                for(size_t ix = 0, im = 0; ix < NXY; ++ix) {
+                    const size_t gix = (size_t)ix + k * NXY;
+                    const uint8_t layer = slice[ix];
+                    if(INMASK_LABEL(layer)) { // in mask
+                        uint8_t buf[NHOOD_NEUMANN_N];
+                        get_nhood3d_neumann_u8(gix,labels,dims,buf);
+                        if(layer < NREGION - 1) {
+                            for(size_t i = 0; i < NHOOD_NEUMANN_N; ++i) {
+                                if(layer - 1 == buf[i]) { inmask[im] = layer; break; } // L* top
+                            }
+                        } else if(layer == NREGION - 1) {
+                            for(size_t i = 0; i < NHOOD_NEUMANN_N; ++i) {
+                                if(layer - 1 == buf[i]) { inmask[im] = layer; break; } // L6 top
+                                if(NREGION == buf[i]) { inmask[im] = NREGION; break; } // L6 bottom = WM
+                            }
+                        }
+                        ++im;
+                    } else if(layer > NREGION) ++nbad;
+                }
+            }
+            if(nbad > 0) FATAL("have %zu values > NREGION in layers file",nbad);
+        }
+
+        { // logging
+            size_t nbnd[1 + NREGION];
+            memset(nbnd,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
+            for(size_t i = 0; i < ntot; ++i) nbnd[mask[i]]++;
+            info("interior size: %zu",nbnd[0]);
+            info0("boundary sizes:");
+            for(size_t i = 1; i < 1 + NREGION; ++i) printf("    %zu\n",nbnd[i]);
+        }
+
+        { // save mask sizes
+            errno = 0;
+            FILE *fp = fopen(opts.nmask_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.nmask_file);
+            fwrite(nmask,sizeof(*nmask),NZ,fp);
+            fclose(fp);
+        }
+
+        { // save mask
+            errno = 0;
+            FILE *fp = fopen(opts.mask_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.mask_file);
+            fwrite(mask,sizeof(*mask),ntot,fp);
+            fclose(fp);
+        }
+
+        free(mask);
+
+        if(loadm == LOAD_MMAP) { // munmap
+            errno = 0;
+            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
+            close(fd);
+        } else free(labels);
+
+        return 0;
+    }
+
+    if(opts.ext_mask) {
+#define INMASK_INT8(x) ((x) >= 0 && (x) <= (int8_t)NREGION)
+        if(!opts.labels_file_isset) FATAL0("missing required input labels file");
+        if(!opts.mask_file_isset) FATAL0("missing required output mask file");
+        if(!opts.nmask_file_isset) FATAL0("missing required output mask sizes file");
+
+                int8_t *labels = NULL;
+
+        errno = 0;
+        int fd = open(opts.labels_file,O_RDONLY);
+        if(fd == -1) ERRFATAL("open[r]","%s",opts.labels_file);
+
+        void *labels_map = NULL;
+        if(loadm == LOAD_MMAP) { // mmap
+            errno = 0;
+            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd,0);
+            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
+
+            errno = 0;
+            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            labels = labels_map;
+        } else { // read
+            errno = 0;
+            labels = malloc(NVOX * sizeof(*labels));
+            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
+            if(loadm == LOAD_PARALLEL) {
+                size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(fd,labels) reduction(+:nerr) shared(dims)
+#endif
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*labels);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pread(fd,&labels[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
+                close(fd);
+            } else {
+                FILE *fp = fdopen(fd,"rb");
+                if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
+                fclose(fp);
+                fd = -1; // invalid from here on
+            }
+        }
+                uint64_t nmask[NZ];
+        memset(nmask,0x0,NZ * sizeof(*nmask));
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels) reduction(+:nmask[:NZ]) shared(dims,NREGION)
+#endif
+        for(size_t i = 0; i < NVOX; ++i)
+            nmask[i / NXY] += INMASK_INT8(labels[i]);
+
+        size_t ntot = 0;
+        size_t mask_off[NZ];
+        for(size_t i = 0; i < NZ; ++i) {
+            mask_off[i] = ntot;
+            ntot += nmask[i];
+        }
+        if(mask_off[1] != 0 || mask_off[NZ - 1] != ntot)
+            FATAL("malformed mask with size %zu",ntot);
+
+        errno = 0;
+        uint8_t *mask = calloc(ntot,sizeof(*mask)); // init to zero (interior)
+        if(NULL == mask) ERRFATAL("calloc","%zu bytes",ntot * sizeof(*mask));
+
+        { // extract mask
+            size_t nbad = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(labels,mask,mask_off) shared(dims,NREGION) reduction(+:nbad)
+#endif
+            for(size_t k = 1; k < NZ - 1; ++k) {
+                const int8_t *slice = &labels[k * NXY];
+                uint8_t *inmask = &mask[mask_off[k]];
+                for(size_t ix = 0, im = 0; ix < NXY; ++ix) {
+                    const int8_t layer = slice[ix];
+                    if(INMASK_INT8(layer)) inmask[im++] = layer; // in mask, set mask
+                    else if(layer > (int8_t)NREGION) ++nbad;
+                }
+            }
+            if(nbad > 0) FATAL("have %zu values > NREGION in layers file",nbad);
+        }
+
+                { // logging
+            size_t nbnd[1 + NREGION];
+            memset(nbnd,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
+            for(size_t i = 0; i < ntot; ++i) nbnd[mask[i]]++;
+            info("interior size: %zu",nbnd[0]);
+            info0("boundary sizes:");
+            for(size_t i = 1; i < 1 + NREGION; ++i) printf("    %zu\n",nbnd[i]);
+        }
+                { // save mask sizes
+            errno = 0;
+            FILE *fp = fopen(opts.nmask_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.nmask_file);
+            fwrite(nmask,sizeof(*nmask),NZ,fp);
+            fclose(fp);
+        }
+
+        { // save mask
+            errno = 0;
+            FILE *fp = fopen(opts.mask_file,"wb");
+            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.mask_file);
+            fwrite(mask,sizeof(*mask),ntot,fp);
+            fclose(fp);
+        }
+
+        free(mask);
+                if(loadm == LOAD_MMAP) { // munmap
+            errno = 0;
+            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
+            close(fd);
+        } else free(labels);
+
+        return 0;
+#undef INMASK_INT8
+    }
 
     if(opts.conv_u16) {
-        if(!opts.labels_file_isset || !opts.init_file_isset || !opts.out_file_isset)
-            FATAL0("missing required file paths for labels, initial solution and output");
+        if(!opts.labels_file_isset) FATAL0("missing required input labels file");
+        if(!opts.init_file_isset) FATAL0("missing required input initial solution file");
+        if(!opts.out_file_isset) FATAL0("missing required output file");
 
         uint8_t *labels = NULL;
         float *smooth_in = NULL;
@@ -1548,9 +1929,9 @@ const size_t _idx = 0; (void)_idx;
 #endif
         for(size_t i = 0; i < NVOX; ++i) {
             if(0 == labels[i]) {
-                smooth_out[i] = U16FACTOR + 1; // 65534 outside
+                smooth_out[i] = OUT_U16; // 65534 outside
             } else if(NREGION == labels[i]) {
-                smooth_out[i] = U16FACTOR + 2; // 65535 at WM
+                smooth_out[i] = WM_U16; // 65535 at WM
             } else {
                 smooth_out[i] = smooth_in[i] * U16FACTOR; // 0 .. 65533
             }
@@ -1601,8 +1982,9 @@ const size_t _idx = 0; (void)_idx;
     }
 
     if(opts.conv_f32) {
-        if(!opts.labels_file_isset || !opts.init_file_isset || !opts.out_file_isset)
-            FATAL0("missing required file paths for labels, initial solution and output");
+        if(!opts.labels_file_isset) FATAL0("missing required input labels file");
+        if(!opts.init_file_isset) FATAL0("missing required input initial solution file");
+        if(!opts.out_file_isset) FATAL0("missing required output file");
 
         uint8_t *labels = NULL;
         uint16_t *smooth_in = NULL;
@@ -1749,139 +2131,23 @@ const size_t _idx = 0; (void)_idx;
         return 0;
     }
 
-    if(opts.get_mask) {
-        if(!opts.labels_file_isset || !opts.mask_file_isset || !opts.nmask_file_isset)
-            FATAL0("missing required file paths for input: labels, and outputs: mask and mask sizes");
+    /* main functionality */
 
-        uint8_t *labels = NULL;
-
-        errno = 0;
-        int fd = open(opts.labels_file,O_RDONLY);
-        if(fd == -1) ERRFATAL("open[r]","%s",opts.labels_file);
-
-        void *labels_map = NULL;
-        if(loadm == LOAD_MMAP) { // mmap
-            errno = 0;
-            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd,0);
-            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
-
-            errno = 0;
-            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
-                PERROR("madvise");
-
-            labels = labels_map;
-        } else { // read
-            errno = 0;
-            labels = malloc(NVOX * sizeof(*labels));
-            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
-            if(loadm == LOAD_PARALLEL) {
-                size_t nerr = 0;
-#ifdef _OPENMP
-#pragma omp parallel for default(none) firstprivate(fd,labels) reduction(+:nerr) shared(dims)
-#endif
-                for(size_t i = 0; i < NZ; ++i) {
-                    size_t count = NXY * sizeof(*labels);
-                    off_t offset = (off_t)i * count;
-                    ssize_t ret = pread(fd,&labels[i * NXY],count,offset);
-                    if(ret == -1 || (size_t)ret != count) ++nerr;
-                }
-                if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
-                close(fd);
-            } else {
-                FILE *fp = fdopen(fd,"rb");
-                if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
-                fclose(fp);
-            }
-        }
-
-        uint64_t nmask[NZ];
-        memset(nmask,0x0,NZ * sizeof(*nmask));
-#ifdef _OPENMP
-#pragma omp parallel for default(none) firstprivate(labels) reduction(+:nmask[:NZ]) shared(dims)
-#endif
-        for(size_t i = 0; i < NVOX; ++i)
-            nmask[i / NXY] += INMASK_LABEL(labels[i]);
-
-        size_t ntot = 0;
-        size_t mask_off[NZ];
-        for(size_t i = 0; i < NZ; ++i) {
-            mask_off[i] = ntot;
-            ntot += nmask[i];
-        }
-        if(mask_off[1] != 0 || mask_off[NZ - 1] != ntot)
-            FATAL("malformed mask with size %zu",ntot);
-
-        errno = 0;
-        uint8_t *mask = calloc(ntot,sizeof(*mask));
-        if(NULL == mask) ERRFATAL("calloc","%zu bytes",ntot * sizeof(*mask));
-
-#ifdef _OPENMP
-#pragma omp parallel for default(none) firstprivate(labels,mask,mask_off) shared(dims,NREGION)
-#endif
-        for(size_t k = 1; k < NZ - 1; ++k) {
-            uint8_t *slice = &labels[k * NXY];
-            uint8_t *inmask = &mask[mask_off[k]];
-            for(size_t ix = 0, im = 0; ix < NXY; ++ix) {
-                size_t gix = (size_t)ix + k * NXY;
-                uint8_t layer = slice[ix];
-                if(INMASK_LABEL(layer)) { // in mask
-                    uint8_t buf[NHOOD_NEUMANN_N];
-                    get_nhood3d_neumann_u8(gix,labels,dims,buf);
-                    if(layer < NREGION - 1) {
-                        for(size_t i = 0; i < NHOOD_NEUMANN_N; ++i) {
-                            if(buf[i] == layer - 1) { inmask[im] = layer; break; } // L* top
-                        }
-                    } else if(layer == NREGION - 1) {
-                        for(size_t i = 0; i < NHOOD_NEUMANN_N; ++i) {
-                            if(buf[i] == layer - 1) { inmask[im] = layer; break; } // L6 top
-                            if(buf[i] == NREGION) { inmask[im] = NREGION; break; } // L6 bottom = WM
-                        }
-                    }
-                    ++im;
-                }
-            }
-        }
-
-        size_t nbnd[1 + NREGION];
-        memset(nbnd,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
-        for(size_t i = 0; i < ntot; ++i) nbnd[mask[i]]++;
-        info("interior size: %zu",nbnd[0]);
-        info0("boundary sizes:");
-        for(size_t i = 1; i < 1 + NREGION; ++i) printf("    %zu\n",nbnd[i]);
-
-        {
-            errno = 0;
-            FILE *fp = fopen(opts.nmask_file,"wb");
-            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.nmask_file);
-            fwrite(nmask,sizeof(*nmask),NZ,fp);
-            fclose(fp);
-        }
-
-        {
-            errno = 0;
-            FILE *fp = fopen(opts.mask_file,"wb");
-            if(NULL == fp) ERRFATAL("fopen[w]","%s",opts.mask_file);
-            fwrite(mask,sizeof(*mask),ntot,fp);
-            fclose(fp);
-        }
-
-        free(mask);
-
-        if(loadm == LOAD_MMAP) { // munmap
-            errno = 0;
-            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
-            close(fd);
-        } else free(labels);
-
-        return 0;
+    /* setup signal handlers */
+    { // SIGINT
+        struct sigaction act = { 0 };
+        act.sa_handler = terminate_handler;
+        sigaction(SIGINT,&act,NULL);
+    }
+    { // SIGALRM
+        struct sigaction act = { 0 };
+        act.sa_handler = alarm_handler;
+        sigaction(SIGALRM,&act,NULL);
     }
 
-    struct sigaction act = { 0 };
-    act.sa_handler = terminate_handler;
-    sigaction(SIGINT,&act,NULL);
-
-    if(!opts.init_file_isset || !opts.mask_file_isset || !opts.nmask_file_isset)
-        FATAL0("missing required file paths for initial solution, mask and mask sizes");
+    if(!opts.mask_file_isset) FATAL0("missing required input mask file");
+    if(!opts.nmask_file_isset) FATAL0("missing required input mask sizes file");
+    if(!opts.out_file_isset) FATAL0("missing required output file");
 
     /* load sizes per slice and mask */
     uint64_t nmask[NZ];
@@ -1898,7 +2164,7 @@ const size_t _idx = 0; (void)_idx;
     uint8_t *maskptr[NZ]; // per-slice pointers
     data_t *maskvals = NULL;
     data_t *maskvalsptr[NZ]; // per-slice pointers
-    {
+    { // load mask
         size_t mask_off[NZ];
         for(size_t k = 0; k < NZ; ++k) {
             mask_off[k] = ntot;
@@ -1922,7 +2188,6 @@ const size_t _idx = 0; (void)_idx;
             maskvalsptr[k] = &maskvals[mask_off[k]];
         }
 
-        // load mask
         if(loadm == LOAD_PARALLEL) {
             errno = 0;
             int fd = open(opts.mask_file,O_RDONLY);
@@ -1965,50 +2230,122 @@ const size_t _idx = 0; (void)_idx;
     data_t *res = NULL;
     void *res_map = NULL;
 
-    // load initial solution
-    if(loadm == LOAD_MMAP) { // mmap
-        errno = 0;
-        fdmap = open(opts.init_file,O_RDWR | O_DSYNC);
-        if(-1 == fdmap) ERRFATAL("open[rw]","%s",opts.init_file);
-
-        errno = 0;
-        res_map = mmap(NULL,NVOX * sizeof(*res),PROT_READ | PROT_WRITE,MAP_SHARED | MAP_NORESERVE,fdmap,0);
-        if(MAP_FAILED == res_map) ERRFATAL("mmap[rw]","%s",opts.init_file);
-
-        if(madvise(res_map,NVOX * sizeof(*res),MADV_RANDOM) == -1) PERROR("madvise");
-
-        res = res_map;
-    } else {
-        errno = 0;
-        res = malloc(NVOX * sizeof(*res));
-        if(NULL == res) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*res));
-        if(loadm == LOAD_PARALLEL) {
+    /* setup initial solution */
+    if(opts.init_file_isset) { // load from file
+        if(loadm == LOAD_MMAP) { // mmap
             errno = 0;
-            int fd = open(opts.init_file,O_RDONLY);
-            if(-1 == fd) ERRFATAL("open[r]","%s",opts.init_file);
-            size_t nerr = 0;
+            fdmap = open(opts.init_file,O_RDWR | O_DSYNC);
+            if(-1 == fdmap) ERRFATAL("open[rw]","%s",opts.init_file);
+
+            errno = 0;
+            res_map = mmap(NULL,NVOX * sizeof(*res),PROT_READ | PROT_WRITE,MAP_SHARED | MAP_NORESERVE,fdmap,0);
+            if(MAP_FAILED == res_map) ERRFATAL("mmap[rw]","%s",opts.init_file);
+
+            if(madvise(res_map,NVOX * sizeof(*res),MADV_RANDOM) == -1) PERROR("madvise");
+
+            res = res_map;
+        } else {
+            errno = 0;
+            res = malloc(NVOX * sizeof(*res));
+            if(NULL == res) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*res));
+            if(loadm == LOAD_PARALLEL) {
+                errno = 0;
+                int fd = open(opts.init_file,O_RDONLY);
+                if(-1 == fd) ERRFATAL("open[r]","%s",opts.init_file);
+                size_t nerr = 0;
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+:nerr) shared(dims)
 #endif
-            for(size_t i = 0; i < NZ; ++i) {
-                size_t count = NXY * sizeof(*res);
-                off_t offset = (off_t)i * count;
-                ssize_t ret = pread(fd,&res[i * NXY],count,offset);
-                if(ret == -1 || (size_t)ret != count) ++nerr;
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*res);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pread(fd,&res[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
+                close(fd);
+            } else {
+                errno = 0;
+                FILE *fp = fopen(opts.init_file,"rb");
+                if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.init_file);
+                if(fread(res,sizeof(*res),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
+                fclose(fp);
             }
-            if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
-            close(fd);
-        } else {
-            errno = 0;
-            FILE *fp = fopen(opts.init_file,"rb");
-            if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.init_file);
-            if(fread(res,sizeof(*res),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
-            fclose(fp);
         }
-    }
 
-    info("loaded initial solution with size %zux%zux%zu (%zu voxels)",NX,NY,NZ,NVOX);
-    warn0("beware of in-file data ordering, NZ must be number of slices");
+        info("loaded initial solution with size %zux%zux%zu (%zu voxels)",NX,NY,NZ,NVOX);
+        warn0("beware of in-file data ordering, NZ must be number of slices");
+    } else if(opts.labels_file_isset) { // init from labels
+        info0("no initial solution provided, will derive it from labels");
+
+        res = malloc(NVOX * sizeof(*res));
+        if(NULL == res) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*res));
+
+                uint8_t *labels = NULL;
+
+        errno = 0;
+        int fd = open(opts.labels_file,O_RDONLY);
+        if(fd == -1) ERRFATAL("open[r]","%s",opts.labels_file);
+
+        void *labels_map = NULL;
+        if(loadm == LOAD_MMAP) { // mmap
+            errno = 0;
+            labels_map = mmap(NULL,NVOX * sizeof(*labels),PROT_READ,MAP_SHARED,fd,0);
+            if(MAP_FAILED == labels_map) PERROR("mmap[r]");
+
+            errno = 0;
+            if(madvise(labels_map,NVOX * sizeof(*labels),MADV_SEQUENTIAL) == -1)
+                PERROR("madvise");
+
+            labels = labels_map;
+        } else { // read
+            errno = 0;
+            labels = malloc(NVOX * sizeof(*labels));
+            if(NULL == labels) ERRFATAL("malloc","%zu bytes",NVOX * sizeof(*labels));
+            if(loadm == LOAD_PARALLEL) {
+                size_t nerr = 0;
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(fd,labels) reduction(+:nerr) shared(dims)
+#endif
+                for(size_t i = 0; i < NZ; ++i) {
+                    size_t count = NXY * sizeof(*labels);
+                    off_t offset = (off_t)i * count;
+                    ssize_t ret = pread(fd,&labels[i * NXY],count,offset);
+                    if(ret == -1 || (size_t)ret != count) ++nerr;
+                }
+                if(nerr > 0) FATAL("pread failed: %zu times with %zu items",nerr,NVOX);
+                close(fd);
+            } else {
+                FILE *fp = fdopen(fd,"rb");
+                if(fread(labels,sizeof(*labels),NVOX,fp) != NVOX) FATAL("fread failed: %zu items",NVOX);
+                fclose(fp);
+                fd = -1; // invalid from here on
+            }
+        }
+
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(res) shared(labels,dims,NREGION)
+#endif
+        for(size_t i = 0; i < NVOX; ++i) {
+#if U16DATA
+            if(0 == labels[i]) res[i] = OUT_U16;
+            else if(NREGION == labels[i]) res[i] = WM_U16;
+            else if (2 == NREGION) res[i] = 0;
+            else res[i] = ((NREGION - 1 - labels[i]) / (float)(NREGION - 2)) * U16FACTOR;
+#elif FLTDATA
+            if(0 == labels[i]) res[i] = OUT_FLT;
+            else if(NREGION == labels[i]) res[i] = WM_FLT;
+            else if (2 == NREGION) res[i] = 0.0;
+            else res[i] = ((NREGION - 1 - labels[i]) / (float)(NREGION - 2));
+#endif
+        }
+
+                if(loadm == LOAD_MMAP) { // munmap
+            errno = 0;
+            if(munmap(labels_map,NVOX * sizeof(*labels)) == -1) PERROR("munmap");
+            close(fd);
+        } else free(labels);
+    } else FATAL0("no initial solution provided, and no labels file to derive it from");
 
     size_t slice_rle_n[NZ]; memset(slice_rle_n,0x0,NZ * sizeof(*slice_rle_n));
     uint32_t *slice_rle_start[NZ];
@@ -2069,14 +2406,15 @@ const size_t _idx = 0; (void)_idx;
     data_t bnd_vals[1 + NREGION];
     bnd_vals[0] = 0;
 
-    if(opts.bnd_file_isset) { // read boundary values
+    /* setup initial boundary values */
+    if(opts.bnd_file_isset) { // read from file
         errno = 0;
         FILE *fp = fopen(opts.bnd_file,"rb");
         if(NULL == fp) ERRFATAL("fopen[r]","%s",opts.bnd_file);
         if(fread(&bnd_vals[1],sizeof(*bnd_vals),NREGION,fp) != NREGION)
             FATAL("fread failed: %zu items",(size_t)NREGION);
         fclose(fp);
-    } else if(opts.bnd_vals_isset) {
+    } else if(opts.bnd_vals_isset) { // parse from CLI
         char *rtxt = opts.bnd_vals;
         size_t nval = 0;
         data_t val;
@@ -2094,7 +2432,7 @@ const size_t _idx = 0; (void)_idx;
             bnd_vals[++nval] = val;
         } while(NULL != rtxt && nval < NREGION);
         if(nval != NREGION) FATAL("expected %zu initial boundary values, got %zu",NREGION,nval);
-    } else { // init boundaries to uniform layer depths
+    } else { // init uniformly
 #if U16DATA
         for(size_t i = 0; i < NREGION; ++i)
             bnd_vals[1 + i] = ((NREGION - 1 - i) / (float)(NREGION - 1)) * U16FACTOR;
@@ -2122,8 +2460,9 @@ for(size_t k = 1; k < NZ - 1; ++k) {
 }
 
     info("start iteration up to %zu",opts.iter_max);
-    info("updating boundary values at relative delta %g, convergence at absolute delta %g",
-         opts.delta_bnd,opts.delta_tol);
+    if(opts.force_bnd) info0("forcing initial boundary values");
+    else info("updating boundary values at relative delta %g",opts.delta_bnd);
+    info("convergence at absolute delta %g",opts.delta_tol);
 
     double diff = 0.0;
     double delta = 0.0;
@@ -2131,6 +2470,7 @@ for(size_t k = 1; k < NZ - 1; ++k) {
     double bnd_diff = 0.0;
     double bnd_delta = 0.0;
     double bnd_delta_rel = 0.0;
+    /* smoothing loop */
     for(size_t iter = 1; iter <= opts.iter_max && keepRunning; ++iter) {
         struct timespec ts_begin, ts_end;
         clock_gettime(CLOCK_MONOTONIC,&ts_begin);
@@ -2182,7 +2522,23 @@ for(size_t k = 1; k < NZ - 1; ++k) {
         delta = fabs(diff - delta);
         delta_rel = delta / diff;
 
-        if(delta_rel < opts.delta_bnd) { // update boundary values for smoothness
+        if(opts.force_bnd) { // force initial boundary values
+            // delineate boundaries
+#ifdef _OPENMP
+#pragma omp parallel for default(none) firstprivate(res,maskptr,bnd_vals) shared(slice_rle_n,slice_rle_start,slice_rle_end,dims) schedule(dynamic)
+#endif
+for(size_t k = 1; k < NZ - 1; ++k) {
+    data_t *slice = &res[k * NXY]; (void)slice;
+    for(size_t i = 0, im = 0; i < slice_rle_n[k]; ++i) {
+        for(size_t ix = slice_rle_start[k][i]; ix <= slice_rle_end[k][i]; ++ix, ++im) {
+            uint8_t msk = maskptr[k][im];
+            if(msk > 0) {
+                slice[ix] = bnd_vals[maskptr[k][im]];
+            }
+        }
+    }
+}
+        } else if(delta_rel < opts.delta_bnd) { // update boundary values for smoothness
             double bnd_mean[1 + NREGION];
             memset(bnd_mean,0x0,(1 + NREGION) * sizeof(*nbnd)); // init
             bnd_delta = bnd_diff;
@@ -2252,14 +2608,14 @@ for(size_t k = 1; k < NZ - 1; ++k) {
         info("iteration %zu done in %gs, diff = %g (%g), bnd_diff = %g (%g)",
              iter,(msec_end - msec_begin) / 1000.0,diff,delta_rel,bnd_diff,bnd_delta_rel);
 
-        if(bnd_delta > 0 &&
-            delta < opts.delta_tol && bnd_delta < opts.delta_tol) {
+        if((opts.force_bnd || bnd_delta > 0)
+            && delta < opts.delta_tol && bnd_delta < opts.delta_tol) {
             info0("converged!");
             break;
         }
     }
 
-    { // final boundary smoothing
+    if(!opts.force_bnd) { // final boundary smoothing
 #ifdef _OPENMP
 #pragma omp parallel default(none) firstprivate(res,maskptr,maskvalsptr,NREGION) shared(diff,slice_rle_n,slice_rle_start,slice_rle_end,dims)
     {
@@ -2312,9 +2668,9 @@ for(size_t k = 1; k < NZ - 1; ++k) {
     }
 
     bool couldsave = false;
-    info("writing final solution to %s",opts.out_file);
     // write final solution
     for(size_t try = 1; !couldsave && try <= MAX_RETRY_SAVE; ++try) {
+        info("writing final solution to %s (try %zu)",opts.out_file,try);
         if(savem == SAVE_PARALLEL) {
             errno = 0;
             int fd = creat(opts.out_file,CREAT_MASK);

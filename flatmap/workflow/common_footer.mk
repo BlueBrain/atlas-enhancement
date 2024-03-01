@@ -19,7 +19,7 @@ endif
 # view
 .PHONY: view-nrrd
 view-nrrd:
-	$(foreach o,$(OUTPUTS),$(NRRD_VIEWER) $o;)
+	$(foreach o,$(filter %.nrrd,$(OUTPUTS)),$(NRRD_VIEWER) $o;)
 
 .PHONY: view-image
 view-image:
