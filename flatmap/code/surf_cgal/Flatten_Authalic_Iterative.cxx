@@ -12,6 +12,7 @@
 #include <cassert>
 #include <iostream>
 #include <fstream>
+#include <boost/lexical_cast.hpp>
 
 typedef CGAL::Simple_cartesian<double>      Kernel;
 typedef Kernel::Point_2                     Point_2;
@@ -30,7 +31,7 @@ typedef SurfaceMesh::Property_map<vertex_descriptor, Point_2>  UV_pmap;
 namespace SMP = CGAL::Surface_mesh_parameterization;
 
 // https://github.com/CGAL/cgal/issues/2994
-bool uvmap_off(std::ofstream &out, SurfaceMesh & sm, UV_pmap uv_map)  {
+static bool uvmap_off(std::ofstream &out, SurfaceMesh & sm, UV_pmap uv_map)  {
     std::size_t vertices_counter = 0, faces_counter = 0;
     typedef std::unordered_map<vertex_descriptor, std::size_t> Vertex_index_map;
     Vertex_index_map vium;
@@ -64,7 +65,7 @@ bool uvmap_off(std::ofstream &out, SurfaceMesh & sm, UV_pmap uv_map)  {
         return 1;
 }
 
-bool read_vertices(const SurfaceMesh& mesh, const char* filename, Vd_array& fixed_vertices) {
+static bool read_vertices(const SurfaceMesh& mesh, const char* filename, Vd_array& fixed_vertices) {
     std::string str = filename;
     if( (str.length()) < 14 || (str.substr(str.length() - 14) != ".selection.txt") ) {
         std::cerr << "Error: vertices must be given by a *.selection.txt file" << std::endl;
@@ -138,7 +139,8 @@ int main(int argc, char** argv)
     std::cerr << "Found longest border with length: " << bhd.second << std::endl;
 
     Vd_array vda; // vertices as square corners
-    int offset = 0; if(argc > 4) offset = atoi(argv[4]);
+    int offset = 0;
+    if(argc > 4) offset = boost::lexical_cast<int>(argv[4]);
     { // set square corners
         if(argc > 5) { // read corners from file
             if(!read_vertices(sm,argv[5],vda))
@@ -195,7 +197,6 @@ int main(int argc, char** argv)
     // The UV property map that holds the parameterized values
     UV_pmap uv_map = sm.add_property_map<vertex_descriptor, Point_2>("v:uv").first;
 
-    //typedef SMP::Square_border_uniform_parameterizer_3<SurfaceMesh>              Border_parameterizer;
     typedef SMP::Square_border_arc_length_parameterizer_3<SurfaceMesh>              Border_parameterizer;
     Border_parameterizer border_param(vda[0], vda[1], vda[2], vda[3]); // square corners
     typedef SMP::Iterative_authalic_parameterizer_3<SurfaceMesh, Border_parameterizer
@@ -204,6 +205,7 @@ int main(int argc, char** argv)
 
     int iter = 10; if(argc > 3) iter = atoi(argv[3]);
     std::cerr << "Running for " << iter << " iterations" << std::endl;
+    if(iter == 0) return EXIT_SUCCESS;
     SMP::Error_code err = parameterizer.parameterize(sm, bhd.first, uv_map, iter);
     if(err != SMP::OK) {
         std::cerr << "Error: " << SMP::get_error_message(err) << std::endl;

@@ -13,7 +13,7 @@ export:
 	cp $(OUTPUTS) $(EXPORT_DIR)
 else
 export:
-	$(error Please set EXPORT_DIR)
+	$(error Please set EXPORT_DIR to export directory)
 endif
 
 # view

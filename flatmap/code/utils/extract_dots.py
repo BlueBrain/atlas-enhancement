@@ -8,5 +8,5 @@ output_xyz = sys.argv[2]
 vd = VoxelData.load_nrrd(input_nrrd)
 
 w = np.array(np.where(vd.raw == 1)).T
-pos = vd.indices_to_positions(w + 0.5)  # voxel centers
+pos = vd.indices_to_positions(w + 0.5)  # add 0.5 for voxel centers
 np.savetxt(output_xyz, pos, '%.12f')

@@ -58,16 +58,17 @@ int main(int argc, char** argv)
     unsigned int degfit = 2;
     unsigned int degmon = 2;
 
-    if(argc > 3) neigh = atoi(argv[3]);
-    if(argc > 4) degfit = atoi(argv[4]);
-    if(argc > 5) degmon = atoi(argv[5]);
+    if(argc > 3) neigh = boost::lexical_cast<unsigned int>(argv[3]);
+    if(argc > 4) degfit = boost::lexical_cast<unsigned int>(argv[4]);
+    if(argc > 5) degmon = boost::lexical_cast<unsigned int>(argv[5]);
 
     Reconstruction reconstruct = pts2surf(points,neigh,degfit,degmon);
 
     // Write the mesh
-    std::ofstream out ((argc > 2) ? argv[2] : "out.off");
+    const char *outfile = (argc > 2) ? argv[2] : "out.off";
+    std::ofstream out (outfile);
     out << reconstruct;
-    std::cerr << "Done." << std::endl;
+    std::cerr << "Done saving as " << outfile << std::endl;
 
     return EXIT_SUCCESS;
 }
