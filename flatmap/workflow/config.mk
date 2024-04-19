@@ -1,9 +1,9 @@
 ifndef ATLAS_ENHANCEMENT_ROOT
-$(error Please set ATLAS_ENHANCEMENT_ROOT to location of atlas-enhancement)
+$(error Please set ATLAS_ENHANCEMENT_ROOT to the location of atlas-enhancement)
 endif
 
 ifndef USER_DATA_ROOT
-$(error Please set USER_DATA_ROOT to location of user data)
+$(error Please set USER_DATA_ROOT to the location of user data directory)
 endif
 
 SOURCE_CODE_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/code
@@ -52,7 +52,7 @@ PARALLEL := parallel
 GNUPLOT := gnuplot
 GEOMVIEW := geomview
 IMAGE_VIEWER := feh
-NRRD_VIEWER := xgrid3d
+NRRD_VIEWER := xgrid3d -nosel
 NRRD_EDITOR := xgrid3d
 
 # DO NOT EDIT BELOW THIS LINE

@@ -12,6 +12,7 @@
 #include <cassert>
 #include <iostream>
 #include <fstream>
+#include <boost/lexical_cast.hpp>
 
 typedef CGAL::Simple_cartesian<double>      Kernel;
 typedef Kernel::Point_2                     Point_2;
@@ -30,7 +31,7 @@ typedef SurfaceMesh::Property_map<vertex_descriptor, Point_2>  UV_pmap;
 namespace SMP = CGAL::Surface_mesh_parameterization;
 
 // https://github.com/CGAL/cgal/issues/2994
-bool uvmap_off(std::ofstream &out, SurfaceMesh & sm, UV_pmap uv_map)  {
+static bool uvmap_off(std::ofstream &out, SurfaceMesh & sm, UV_pmap uv_map)  {
     std::size_t vertices_counter = 0, faces_counter = 0;
     typedef std::unordered_map<vertex_descriptor, std::size_t> Vertex_index_map;
     Vertex_index_map vium;
@@ -64,7 +65,7 @@ bool uvmap_off(std::ofstream &out, SurfaceMesh & sm, UV_pmap uv_map)  {
         return 1;
 }
 
-bool read_vertices(const SurfaceMesh& mesh, const char* filename, Vd_array& fixed_vertices) {
+static bool read_vertices(const SurfaceMesh& mesh, const char* filename, Vd_array& fixed_vertices) {
     std::string str = filename;
     if( (str.length()) < 14 || (str.substr(str.length() - 14) != ".selection.txt") ) {
         std::cerr << "Error: vertices must be given by a *.selection.txt file" << std::endl;
@@ -96,16 +97,16 @@ bool read_vertices(const SurfaceMesh& mesh, const char* filename, Vd_array& fixe
     while(point_line >> s) {
         if(s >= vds.size())
         {
-            std::cerr << "Error: Vertex index too large" << std::endl;
+            std::cerr << "Error: vertex index " << s << " out of bounds" << std::endl;
             return false;
         }
         vertex_descriptor vd = vds[s];
         if(!is_border(vd, mesh)) { // must be on the border
-            std::cerr << "Error: vertex is not on the border of the mesh" << std::endl;
+            std::cerr << "Error: vertex[" << s << "] " << vd << " is not on the border of the mesh" << std::endl;
             return false;
         }
         if(counter >= 4) { // too many border vertices
-            std::cerr << "Error: Too many vertices are fixed" << std::endl;
+            std::cerr << "Error: only four vertices may be provided" << std::endl;
             return false;
         }
         fixed_vertices[counter++] = vd;
@@ -138,18 +139,23 @@ int main(int argc, char** argv)
     std::cerr << "Found longest border with length: " << bhd.second << std::endl;
 
     Vd_array vda; // vertices as square corners
+    int offset = 0;
+    if(argc > 3) offset = boost::lexical_cast<int>(argv[3]);
     { // set square corners
         if(argc > 4) { // read corners from file
-            read_vertices(sm,argv[4],vda);
+            if(!read_vertices(sm,argv[4],vda))
+                return EXIT_FAILURE;
         } else { // automatic corner selection
             // collect halfedges on the longest border
             std::vector<halfedge_descriptor> hfs;
             for(halfedge_descriptor haf : CGAL::halfedges_around_face(bhd.first, sm))
                 hfs.push_back(haf);
 
+            std::cerr << "Have " << hfs.size()
+                      << " vertices along longest border (offset = " << offset << ")" << std::endl;
+
             // choose square corners equidistant along longest border,
             // starting from point at @offset and cycling around
-            int offset = 0; if(argc > 3) offset = atoi(argv[3]);
             double len = 0;
             for(int i=0;i<hfs.size();i++) {
                 int index = (i + offset) % hfs.size();
@@ -191,7 +197,6 @@ int main(int argc, char** argv)
     // The UV property map that holds the parameterized values
     UV_pmap uv_map = sm.add_property_map<vertex_descriptor, Point_2>("v:uv").first;
 
-    //typedef SMP::Square_border_uniform_parameterizer_3<SurfaceMesh>              Border_parameterizer;
     typedef SMP::Square_border_arc_length_parameterizer_3<SurfaceMesh>              Border_parameterizer;
     Border_parameterizer border_param(vda[0], vda[1], vda[2], vda[3]); // square corners
     typedef SMP::Discrete_authalic_parameterizer_3<SurfaceMesh, Border_parameterizer> Parameterizer;

@@ -1,7 +1,7 @@
 include ../../common_header.mk
 
-ifndef FLATVIEW_DATA_INPUT_FILE
-$(error Please set FLATVIEW_DATA_INPUT_FILE to name of input NRRD file inside input/)
+ifeq (data.nrrd,$(FLATVIEW_DATA_INPUT_FILE))
+$(warning Please remember to set FLATVIEW_DATA_INPUT_FILE to name of input NRRD file)
 endif
 
 output/$(FLATVIEW_DATA_PNG_FILE): input/$(FLATMAP_NRRD_FILE) input/$(FLATVIEW_DATA_INPUT_FILE)

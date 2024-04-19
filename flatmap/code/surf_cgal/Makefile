@@ -8,7 +8,7 @@ endif
 
 compile: | build/
 	cd build && cmake .. \
-		-DCMAKE_BUILD_TYPE=Release\
+		-DCMAKE_BUILD_TYPE=Debug\
 		-DCGAL_DIR=$(CGAL_ROOT)\
 		$(CMAKE_EXTRA_FLAGS)
 	cd build && make

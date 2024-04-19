@@ -61,16 +61,17 @@ int main(int argc, char** argv)
     unsigned int samp = 300;
     unsigned int niter = 4;
 
-    if(argc > 3) neigh = atoi(argv[3]);
-    if(argc > 4) samp = atoi(argv[4]);
-    if(argc > 5) niter = atoi(argv[5]);
+    if(argc > 3) neigh = boost::lexical_cast<unsigned int>(argv[3]);
+    if(argc > 4) samp = boost::lexical_cast<unsigned int>(argv[4]);
+    if(argc > 5) niter = boost::lexical_cast<unsigned int>(argv[5]);
 
     Reconstruction reconstruct = pts2surf(points,neigh,samp,niter);
 
     // Write the mesh
-    std::ofstream out ((argc > 2) ? argv[2] : "out.off");
+    const char *outfile = (argc > 2) ? argv[2] : "out.off";
+    std::ofstream out (outfile);
     out << reconstruct;
-    std::cerr << "Done." << std::endl;
+    std::cerr << "Done saving as " << outfile << std::endl;
 
     return EXIT_SUCCESS;
 }

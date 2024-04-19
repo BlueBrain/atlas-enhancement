@@ -1,7 +1,7 @@
 include ../../common_header.mk
 
-ifndef FLATVIEW_MORPHO_INPUT_FILE
-$(error Please set FLATVIEW_MORPHO_INPUT_FILE to name of input JSON file inside input/)
+ifeq (morphology.json,$(FLATVIEW_MORPHO_INPUT_FILE))
+$(warning Please remember to set FLATVIEW_MORPHO_INPUT_FILE to name of input JSON file)
 endif
 
 TMPFILE_SOMA = $@.soma.tmp
