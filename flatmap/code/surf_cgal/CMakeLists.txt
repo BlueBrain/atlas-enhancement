@@ -27,6 +27,7 @@ if ( NOT Boost_FOUND )
 
 endif()
 
+create_single_source_cgal_program( "Flatten_Authalic_custom.cxx" )
 create_single_source_cgal_program( "Flatten_Authalic.cxx" )
 create_single_source_cgal_program( "Flatten_Authalic_Iterative.cxx" )
 create_single_source_cgal_program( "Nearest_KNN.cxx" )
@@ -40,6 +41,7 @@ find_package(Eigen3 3.1.0) #(requires 3.1.0 or greater)
 include(CGAL_Eigen3_support)
 if(TARGET CGAL::Eigen3_support)
 
+    target_link_libraries(Flatten_Authalic_custom PUBLIC CGAL::Eigen3_support)
     target_link_libraries(Flatten_Authalic PUBLIC CGAL::Eigen3_support)
     target_link_libraries(Flatten_Authalic_Iterative PUBLIC CGAL::Eigen3_support)
     target_link_libraries(Nearest_KNN PUBLIC CGAL::Eigen3_support)
@@ -58,6 +60,7 @@ endif()
 # OpenMP for Eigen
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
+    target_link_libraries(Flatten_Authalic_custom PUBLIC OpenMP::OpenMP_CXX)
     target_link_libraries(Flatten_Authalic PUBLIC OpenMP::OpenMP_CXX)
     target_link_libraries(Flatten_Authalic_Iterative PUBLIC OpenMP::OpenMP_CXX)
 endif()
