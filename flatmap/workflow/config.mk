@@ -8,24 +8,39 @@ endif
 
 SOURCE_CODE_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/code
 WORKFLOW_ROOT := $(ATLAS_ENHANCEMENT_ROOT)/flatmap/workflow
+include $(WORKFLOW_ROOT)/os_detect.mk
 include $(WORKFLOW_ROOT)/userdata.mk
 
 # set shell (more modern than sh)
 SHELL := /bin/bash
 
 # paths to common system utilities
+CMP := cmp
+GREP := grep
+ifeq (Darwin,$(DETECTED_OS))
+# use GNU versions, not BSD versions
+MV := gmv
+LN := gln
+AWK := gawk
+SED := gsed
+CAT := gcat
+SEQ := gseq
+ECHO := gecho
+HEAD := ghead
+EXPR := gexpr
+PASTE := gpaste
+else
 MV := mv
 LN := ln
 AWK := awk
 SED := sed
-CMP := cmp
 CAT := cat
 SEQ := seq
 ECHO := echo
-GREP := grep
 HEAD := head
 EXPR := expr
 PASTE := paste
+endif
 
 # path to Python 3
 PYTHON3 := python3
@@ -33,7 +48,7 @@ PYTHON3 := python3
 # path to GNU parallel
 PARALLEL := parallel
 
-# paths to auxiliary programs
+# paths to auxiliary programs (optional)
 GNUPLOT := gnuplot
 GEOMVIEW := geomview
 IMAGE_VIEWER := feh

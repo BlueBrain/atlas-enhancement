@@ -1,17 +1,11 @@
 remake: clean all
 
 # cmod pattern rules
-%.c : %.cm
+%.c : src/%.cm
 	$(CMOD) $(CMODFLAGS) $(CMOD_INCLUDES) -o $@ $<
 
-%.h : %.hm
+%.h : src/%.hm
 	$(CMOD) $(CMODFLAGS) $(CMOD_INCLUDES) -o $@ $<
-
-%.l : %.lm
-	$(CMOD) -g $(CMODFLAGS) -o $@ $<
-
-%.y : %.ym
-	$(CMOD) -g $(CMODFLAGS) -o $@ $<
 
 # tests
 .PHONY: test test-case

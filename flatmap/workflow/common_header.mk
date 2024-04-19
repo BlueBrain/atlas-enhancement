@@ -19,5 +19,12 @@ include .userconfig.mk
 .PHONY: all view setup
 .DELETE_ON_ERROR: $(OUTPUTS) $(TEMPORARY)
 
+define required
+ifeq (notfound,$(shell type $1 || echo notfound))
+$(error Required binary $1 not found)
+endif
+endef
+$(call required,$(PYTHON3))
+
 setup: $(INPUTS)
 all: $(OUTPUTS)

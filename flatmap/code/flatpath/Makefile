@@ -1,9 +1,11 @@
 include common_header.mk
 
+SHELL := /bin/bash
 .ONESHELL:
 
 CMOD_STDLIB ?= /usr/include
 CMOD_INCLUDES += -I$(CMOD_STDLIB)
+CFLAGS += `gsl-config --cflags`
 LDLIBS += -lz -lm `gsl-config --libs`
 LDFLAGS += -L$(HOME)/lib # use local zlib (for gzfread)
 OBJS := interp_field.o streamline.o
@@ -13,7 +15,8 @@ ifneq (,$(DEBUG))
 CFLAGS += -DDEBUG=$(DEBUG)
 endif
 
-.INTERMEDIATE: $(OBJS) $(OBJS:.o=.c) main
+.INTERMEDIATE: $(OBJS) main
+.PRECIOUS: $(OBJS:.o=.c)
 
 all: flatpath
 

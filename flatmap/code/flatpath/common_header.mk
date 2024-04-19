@@ -3,7 +3,7 @@ LIB_PREFIX = $(PREFIX)/lib
 INC_PREFIX = $(PREFIX)/include
 MOD_PREFIX = $(PREFIX)/include
 
-CC := gcc -std=gnu99
+CC ?= gcc -std=gnu99
 CMOD := cmod
 RM := rm -f
 INSTALL := install
@@ -18,6 +18,6 @@ _CFLAGS := $(CFLAGS)
 CFLAGS = $(_CFLAGS) $(WFLAGS) $(OPTIM_FLAGS) 
 _CPPFLAGS := $(CPPFLAGS)
 CPPFLAGS = $(_CPPFLAGS) $(INCLUDES) $(OMP_FLAGS)
-LDLIBS := -lgomp
+LDLIBS := #-lgomp
 _LDFLAGS := $(LDFLAGS)
-LDFLAGS = $(_LDFLAGS) -Wl,--as-needed
+LDFLAGS = $(_LDFLAGS)

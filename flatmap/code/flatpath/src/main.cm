@@ -148,8 +148,8 @@ int main(int argc, char *argv[]) {
 
     if(opts.do_height_isset && opts.do_depth_isset) {
         error("Please specify only one of %s and %s",
-              %| std:getopt_label:lazy (height) |%,
-              %| std:getopt_label:lazy (depth) |%);
+              %| std:getopt_label (height) |%,
+              %| std:getopt_label (depth) |%);
         return 1;
     }
     /* END option parsing */
@@ -286,8 +286,8 @@ int main(int argc, char *argv[]) {
     if(last == 0 || last > npoint) last = npoint;
     if(last <= first) {
         error("Please specify --%s < --%s",
-              %| std:getopt_label:lazy (first) |%,
-              %| std:getopt_label:lazy (last) |%);
+              %| std:getopt_label (first) |%,
+              %| std:getopt_label (last) |%);
         return 1;
     }
     info("Processing points with index %zu to %zu",first,last - 1);

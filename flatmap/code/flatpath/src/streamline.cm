@@ -12,6 +12,7 @@
 #include <gsl/gsl_errno.h>
 
 %snippet std:logging_prefix = %{ "flatpath" %}
+%include "cmod/common.hm"
 %include "cmod/logging.hm"
 
 int compute_streamline(
