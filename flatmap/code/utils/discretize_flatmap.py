@@ -18,9 +18,11 @@ else:
 
 fmap, fmask = fmutil.load_flatmap(input_nrrd)
 fx_d, fy_d = fmutil.get_discrete_flat_coordinates(fmap.raw, pixel_res, fmask)
-fmap_d = np.stack((fx_d, fy_d), axis=-1)
+fmap_d = np.full_like(fmap.raw, -1, dtype=dtype)
+fmap_d[:,:,:,0][fmask] = fx_d
+fmap_d[:,:,:,1][fmask] = fy_d
 
 assert(np.all((fmap_d[:,:,:,0] > -1) == fmask))
 assert(np.all((fmap_d[:,:,:,1] > -1) == fmask))
 
-fmap.with_data(fmap_d.astype(dtype)).save_nrrd(output_nrrd)
+fmap.with_data(fmap_d).save_nrrd(output_nrrd)
