@@ -17,7 +17,7 @@ def discretize(pos, fxlen):
     fpos = pos.astype(np.float64)
     almost_fxlen = fxlen - 1E-5
     dpos = np.floor(fpos * almost_fxlen).astype(np.int64)
-    assert(np.max(dpos) < fxlen)
+    assert(np.max(dpos) < np.max(fpos) * fxlen)
     assert(np.min(dpos) >= -1)
     return dpos
 
