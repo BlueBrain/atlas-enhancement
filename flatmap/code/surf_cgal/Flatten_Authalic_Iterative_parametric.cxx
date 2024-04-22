@@ -2,7 +2,7 @@
 
 #include <CGAL/Surface_mesh_parameterization/Error_code.h>
 #include <CGAL/Surface_mesh_parameterization/parameterize.h>
-#include <CGAL/Surface_mesh_parameterization/Discrete_authalic_parameterizer_3.h>
+#include <CGAL/Surface_mesh_parameterization/Iterative_authalic_parameterizer_3.h>
 #include <CGAL/Surface_mesh_parameterization/Parametric_curve_border_parameterizer_3.h>
 
 #include <CGAL/Polygon_mesh_processing/measure.h>
@@ -51,15 +51,23 @@ int main(int argc, char** argv)
     std::pair<halfedge_descriptor,double> bhd = CGAL::Polygon_mesh_processing::longest_border(sm);
     std::cerr << "Found longest border with length: " << bhd.second << std::endl;
 
-    int offset = 0;
+    unsigned int iter = 10;
     if(argc > 3)
-        offset = boost::lexical_cast<int>(argv[3]);
+        iter = boost::lexical_cast<unsigned int>(argv[3]);
+    if(iter == 0) {
+        std::cerr << "Error: zero iterations requested" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    int offset = 0;
+    if(argc > 4)
+        offset = boost::lexical_cast<int>(argv[4]);
 
     // The UV property map that holds the parameterized values
     UV_pmap uv_map = sm.add_property_map<vertex_descriptor, Point_2>("v:uv").first;
 
     typedef SMP::Parametric_curve_border_arc_length_parameterizer_3<SurfaceMesh>      Border_parameterizer;
-    typedef SMP::Discrete_authalic_parameterizer_3<SurfaceMesh, Border_parameterizer> Parameterizer;
+    typedef SMP::Iterative_authalic_parameterizer_3<SurfaceMesh,Border_parameterizer> Parameterizer;
     Border_parameterizer *border_param;
 
     halfedge_descriptor start_hd = bhd.first;
@@ -84,7 +92,8 @@ int main(int argc, char** argv)
 
     Parameterizer parameterizer(*border_param);
 
-    SMP::Error_code err = SMP::parameterize(sm, parameterizer, start_hd, uv_map);
+    std::cerr << "Running for " << iter << " iterations" << std::endl;
+    SMP::Error_code err = parameterizer.parameterize(sm, start_hd, uv_map, iter);
     if(err != SMP::OK) {
         std::cerr << "Error: " << SMP::get_error_message(err) << std::endl;
         return EXIT_FAILURE;

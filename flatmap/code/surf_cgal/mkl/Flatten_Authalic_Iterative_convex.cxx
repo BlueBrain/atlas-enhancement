@@ -1,8 +1,13 @@
+#define EIGEN_USE_MKL_ALL 1
+#define EIGEN_USE_MKL 1
+#define EIGEN_USING_STD(x) EIGEN_USING_STD_MATH(x)
+#include <Eigen/PardisoSupport>
+
 #include "Flatten_common.hpp"
 
 #include <CGAL/Surface_mesh_parameterization/Error_code.h>
 #include <CGAL/Surface_mesh_parameterization/parameterize.h>
-#include <CGAL/Surface_mesh_parameterization/Discrete_authalic_parameterizer_3.h>
+#include <CGAL/Surface_mesh_parameterization/Iterative_authalic_parameterizer_3.h>
 #include <CGAL/Surface_mesh_parameterization/Convex_border_parameterizer_3.h>
 
 #include <CGAL/Polygon_mesh_processing/measure.h>
@@ -36,21 +41,30 @@ int main(int argc, char** argv)
     }
     std::cerr << "Have " << points.size() << " border points" << std::endl;
 
-    int offset = 0;
+    unsigned int iter = 10;
     if(argc > 4)
-        offset = boost::lexical_cast<int>(argv[4]);
+        iter = boost::lexical_cast<unsigned int>(argv[4]);
+    if(iter == 0) {
+        std::cerr << "Error: zero iterations requested" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    int offset = 0;
+    if(argc > 5)
+        offset = boost::lexical_cast<int>(argv[5]);
 
     Vd_vector vda; // vertices of polygon corners
-    if(argc > 5) { // read corners from file
-        if(!read_vertices(sm,argv[5],vda))
+    if(argc > 6) { // read corners from file
+        if(!read_vertices(sm,argv[6],vda))
             return EXIT_FAILURE;
     }
 
     // The UV property map that holds the parameterized values
     UV_pmap uv_map = sm.add_property_map<vertex_descriptor, Point_2>("v:uv").first;
 
-    typedef SMP::Convex_border_arc_length_parameterizer_3<SurfaceMesh>                Border_parameterizer;
-    typedef SMP::Discrete_authalic_parameterizer_3<SurfaceMesh, Border_parameterizer> Parameterizer;
+    typedef SMP::Convex_border_arc_length_parameterizer_3<SurfaceMesh>                    Border_parameterizer;
+    typedef SMP::Iterative_authalic_parameterizer_3<SurfaceMesh, Border_parameterizer,
+                CGAL::Eigen_solver_traits<Eigen::PardisoLU<Eigen::SparseMatrix<double>>>> Parameterizer;
     Border_parameterizer *border_param;
 
     halfedge_descriptor start_hd = bhd.first;
@@ -69,7 +83,8 @@ int main(int argc, char** argv)
 
     Parameterizer parameterizer(*border_param);
 
-    SMP::Error_code err = SMP::parameterize(sm, parameterizer, start_hd, uv_map);
+    std::cerr << "Running for " << iter << " iterations" << std::endl;
+    SMP::Error_code err = parameterizer.parameterize(sm, start_hd, uv_map, iter);
     if(err != SMP::OK) {
         std::cerr << "Error: " << SMP::get_error_message(err) << std::endl;
         return EXIT_FAILURE;
