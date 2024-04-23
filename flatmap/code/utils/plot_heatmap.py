@@ -53,13 +53,13 @@ def plot_heatmap(array, flatpix, cmap=colorcet.gray, span=None):
 
 
 if __name__ == "__main__":
-    import voxcell as vc
+    from voxcell import VoxelData
     from parse_cmap import parse_cmap
 
     cmap = parse_cmap(args.colormap)
 
     LOGGER.info('Loading input data "{}"'.format(args.input_nrrd))
-    vd = vc.VoxelData.load_nrrd(args.input_nrrd)
+    vd = VoxelData.load_nrrd(args.input_nrrd)
     flatpix = vd.shape[0]
     array = vd.raw
 

@@ -1,4 +1,4 @@
-$(addprefix input/,$(USER_INPUT_FILES)) input/$(ANNOTATIONS_FILE) input/$(MASK_FILE): input/%: $(USER_DATA_ROOT)/%
+$(addprefix input/,$(USERDATA)): input/%: $(USER_DATA_ROOT)/%
 	$(LN) -sf $< $@
 
 input/%:

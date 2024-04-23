@@ -2,8 +2,8 @@ import numpy as np
 
 
 def load_flatmap(file):
-    import voxcell
-    vd = voxcell.VoxelData.load_nrrd(file)
+    from voxcell import VoxelData
+    vd = VoxelData.load_nrrd(file)
 
     # mask for mapped values
     fx_msk = vd.raw[:,:,:,0] > -1

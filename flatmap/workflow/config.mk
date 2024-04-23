@@ -68,6 +68,12 @@ FLATMAP_STEPS := 01_stageI\
 				 03_stageIII
 
 # NOTE: include possible only from WORKFLOW_ROOT
+-include postproc/config.mk
+
+POSTPROC_STEPS := $(STEPS)
+POSTPROC_STEPS := $(addprefix postproc/,$(POSTPROC_STEPS))
+
+# NOTE: include possible only from WORKFLOW_ROOT
 -include metrics/config.mk
 
 METRICS_STEPS := $(STEPS)
@@ -83,6 +89,7 @@ APPLICATIONS_STEPS := $(STEPS)
 APPLICATIONS_STEPS := $(addprefix applications/,$(APPLICATIONS_STEPS))
 
 STEPS := $(FLATMAP_STEPS)\
+		 $(POSTPROC_STEPS)\
 		 $(METRICS_STEPS)\
 		 $(APPLICATIONS_STEPS)
 

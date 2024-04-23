@@ -1,11 +1,11 @@
-import voxcell as vc
+from voxcell import VoxelData
 import numpy as np
 import sys
 
 nrrd_file = sys.argv[1]
 output_file = sys.argv[2]
 
-vd = vc.VoxelData.load_nrrd(nrrd_file)
+vd = VoxelData.load_nrrd(nrrd_file)
 n_notnan = np.sum(~np.isnan(vd.raw))
 shape_str = " ".join([str(x) for x in vd.raw.shape])
 voxdim_str = " ".join(["{:.8f}".format(x) for x in vd.voxel_dimensions])
