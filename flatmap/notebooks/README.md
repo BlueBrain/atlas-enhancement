@@ -1,14 +1,12 @@
-# A jupyter notebook to generate plots comparing flatmaps
+# A jupyter notebook to compare flatmaps in various ways
 
 The following files will be needed:
   - One reference flatmap
-    - We used the AIBS dorsal flatmap from: https://github.com/AllenInstitute/mouse_connectivity_models/tree/master/mcmodels/core/cortical_coordinates
+    - We used the AIBS dorsal flatmap at 10 um resolution: `https://download.alleninstitute.org/informatics-archive/current-release/mouse_ccf/cortical_coordinates/ccf_2017/dorsal_flatmap_paths_10.h5`
   - One candidate flatmap
-    - We used our candidate flatmap for mouse Isocortex at 100 um resolution. To be obtained from our Zenodo repo.
+    - We used our flatmap for mouse Isocortex at 10 um resolution, which can be obtained from our Zenodo repo: `https://zenodo.org/records/10686776`.
   - Region annotation voxel volume
-    - We used the AIBS CCFv3 volume: https://download.alleninstitute.org/informatics-archive/current-release/mouse_ccf/annotation
+    - We used the AIBS CCFv3 volume at 10 um resolution: `https://download.alleninstitute.org/informatics-archive/current-release/mouse_ccf/annotation/ccf_2022/annotation_10.nrrd`
     - Note that the annotation volume and both flatmaps must be using the same voxel dimensions and offset!
   - File defining the region hierarchy
-    - Obtain Table S2 from the article introducing the Allen CCFv3 (https://www.sciencedirect.com/science/article/pii/S0092867420304025#mmc2), then convert it from the offered Excel format to .csv
-
-
+    - We used the AIBS CCFv3 hierarchy: `http://api.brain-map.org/api/v2/structure_graph_download/1.json`
