@@ -225,7 +225,7 @@ if __name__ == "__main__":
         flatpos = fmap.raw[mask]
         flatval = dat.raw[mask]
 
-    if args.split:
+    if lay is not None:
         LOGGER.info('Masking layer annotation')
         layval = lay.raw[mask]
         for k, v in ldict.items():
