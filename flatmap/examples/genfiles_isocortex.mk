@@ -1,4 +1,6 @@
 PYTHON := python3
+ECHO := echo
+SED := sed
 
 CCFV3_INPUT_DIR := input
 OUTPUT_DIR := output
@@ -12,7 +14,7 @@ all: $(ALL_OUTPUTS)
 
 # outside, inside, sides, bottom, top
 $(OUTPUT_DIR)/mask.nrrd: $(OUTPUT_DIR)/mask_hemi.nrrd $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd $(CCFV3_INPUT_DIR)/isocortex_boundary_10.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 hem = VoxelData.load_nrrd('$<')                      \n\
@@ -27,7 +29,7 @@ bnd.with_data(bnd.raw.astype(np.int8)).save_nrrd('$@')\n\
 
 # isocortex regions in one hemisphere
 $(OUTPUT_DIR)/annotations.nrrd: $(OUTPUT_DIR)/mask_hemi.nrrd $(OUTPUT_DIR)/isocortex_regions_10.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 hem = VoxelData.load_nrrd('$<')                      \n\
@@ -38,7 +40,7 @@ reg.save_nrrd('$@')                                  \n\
 
 # orientation vector
 $(ORIENTATION_OUTPUTS): $(OUTPUT_DIR)/extension.nrrd $(OUTPUT_DIR)/mask_isocortex.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 ext = VoxelData.load_nrrd('$<')                      \n\
@@ -55,7 +57,7 @@ msk.with_data(dz.astype(np.float32)).save_nrrd('$(word 3,$(ORIENTATION_OUTPUTS))
 
 # extend values before gradient computation
 $(OUTPUT_DIR)/extension.nrrd: $(OUTPUT_DIR)/mask_hemi.nrrd $(OUTPUT_DIR)/mask_isocortex.nrrd $(OUTPUT_DIR)/relative_depth.nrrd $(CCFV3_INPUT_DIR)/isocortex_boundary_10.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 from scipy import ndimage                            \n\
@@ -104,7 +106,7 @@ rdp.with_data(rdp.raw.astype(np.float32)).save_nrrd('$@')\n\
 
 # Laplace solution as relative depth
 $(OUTPUT_DIR)/relative_depth.nrrd: $(OUTPUT_DIR)/mask_isocortex.nrrd $(CCFV3_INPUT_DIR)/laplacian_10.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 msk = VoxelData.load_nrrd('$<')                      \n\
@@ -115,9 +117,22 @@ res[bmsk] = 1 - lap.raw[bmsk]                        \n\
 lap.with_data(res).save_nrrd('$@')                   \n\
 " | $(PYTHON)
 
+# isocortex mask in both hemispheres
+$(OUTPUT_DIR)/hemispheres.nrrd: $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd $(OUTPUT_DIR)/mask_hemi.nrrd $(OUTPUT_DIR)/mask_hemi_other.nrrd
+	$(ECHO) -e "\
+import numpy as np                                   \n\
+from voxcell import VoxelData                        \n\
+msk = VoxelData.load_nrrd('$<')                      \n\
+hem = VoxelData.load_nrrd('$(word 2,$^)')            \n\
+hemo = VoxelData.load_nrrd('$(word 3,$^)')           \n\
+msk.raw[msk.raw != 0] = 1                            \n\
+msk.raw[hemo.raw == 1] = msk.raw[hemo.raw == 1] * 2  \n\
+msk.with_data(msk.raw.astype(np.uint8)).save_nrrd('$@')\n\
+" | $(PYTHON)
+
 # isocortex mask in one hemisphere
 $(OUTPUT_DIR)/mask_isocortex.nrrd: $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd $(OUTPUT_DIR)/mask_hemi.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 msk = VoxelData.load_nrrd('$<')                      \n\
@@ -127,11 +142,11 @@ msk.raw[msk.raw != 0] = 1                            \n\
 msk.with_data(msk.raw.astype(np.uint8)).save_nrrd('$@')\n\
 " | $(PYTHON)
 
-# other hemisphere
-#$(OUTPUT_DIR)/mask_hemi.nrrd: RANGE := 0, msk.shape[2] // 2
+# hemisphere masks
 $(OUTPUT_DIR)/mask_hemi.nrrd: RANGE := msk.shape[2] // 2, msk.shape[2]
-$(OUTPUT_DIR)/mask_hemi.nrrd: $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+$(OUTPUT_DIR)/mask_hemi_other.nrrd: RANGE := 0, msk.shape[2] // 2
+$(OUTPUT_DIR)/mask_hemi.nrrd $(OUTPUT_DIR)/mask_hemi_other.nrrd: $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd | $(OUTPUT_DIR)/
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData                        \n\
 msk = VoxelData.load_nrrd('$<')                      \n\
@@ -142,7 +157,7 @@ msk.with_data(hem.astype(np.uint8)).save_nrrd('$@')  \n\
 
 # isocortex regions with simple labels
 $(OUTPUT_DIR)/isocortex_regions_10.nrrd: $(OUTPUT_DIR)/isocortex_annotation_10.nrrd $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd $(OUTPUT_DIR)/1_layersfix.json | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 import numpy as np                                   \n\
 from voxcell import VoxelData, RegionMap             \n\
 annot = VoxelData.load_nrrd('$(word 1,$^)')          \n\
@@ -171,7 +186,7 @@ annot.with_data(res).save_nrrd('$@')                 \n\
 
 # isocortex only
 $(OUTPUT_DIR)/isocortex_annotation_10.nrrd: $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd $(CCFV3_INPUT_DIR)/annotation_10.nrrd | $(OUTPUT_DIR)/
-	echo -e "\
+	$(ECHO) -e "\
 from voxcell import VoxelData                        \n\
 msk = VoxelData.load_nrrd('$<')                      \n\
 annot = VoxelData.load_nrrd('$(word 2,$^)')          \n\
@@ -181,7 +196,7 @@ annot.save_nrrd('$@')                                \n\
 
 # unify layer names in hierarchy
 $(OUTPUT_DIR)/1_layersfix.json: $(CCFV3_INPUT_DIR)/1.json | $(OUTPUT_DIR)/
-	sed \
+	$(SED) \
 		-e 's/, Layer/, layer/' \
 		-e 's@/Layer \([1-6]\)@, layer \1@' \
 		-e 's/, 6\([ab]\)/, layer 6\1/' \

@@ -14,13 +14,14 @@ RECONSTRUCT_SURFACE_EXTRA := 12 300 4
 NREFINE := 3
 
 ## change flattening algorithm
-FLATTEN_MESH_BIN := $(SOURCE_CODE_ROOT)/surf_cgal/build_mkl/Flatten_Authalic_Iterative
+FLATTEN_MESH_BIN := $(SOURCE_CODE_ROOT)/surf_cgal/build/Flatten_Authalic_Iterative_convex
 
-## extra arguments to flattening algorithm (FlattenAuthalicIterative)
+## extra arguments to flattening algorithm (FlattenAuthalicIterative_Convex)
+### border points
 ### number of iterations
 ### offset of first corner along boundary
 ### corners .selection.txt file
-FLATTEN_MESH_EXTRA := 10 0 #empty
+FLATTEN_MESH_EXTRA := border_points.txt 10 -1840# offset = -230 * 2 ** NREFINE
 
 ## how many streamlines computed per run?
 FLATPATH_BLOCKSIZE := 100000
