@@ -208,17 +208,16 @@ if __name__ == "__main__":
             data_valid = (dmsk.raw != 0)
             del dmsk
 
-        ldict = {1:'1', 2:'23', 4:'4', 5:'5', 6:'6'}
-        if args.only_layer is not None:
-            if args.only_layer not in ldict:
-                raise ValueError("requested layer {} does not exist".format(args.only_layer))
-            ldict = {args.only_layer: ldict[args.only_layer]}
-
         lay = None
         if args.split or args.only_layer is not None:
-            LOGGER.info('Loading layer annotation')
+            LOGGER.info('Loading layer annotation "{}"'.format(args.layers))
             lay = VoxelData.load_nrrd(args.layers)
             assert(lay.shape == dat.shape)
+            ldict = {x: x for x in np.unique(lay.raw)[1:]}  # skip background first value (= 0)
+            if args.only_layer is not None:
+                if args.only_layer not in ldict:
+                    raise ValueError("requested layer {} does not exist".format(args.only_layer))
+                ldict = {args.only_layer: ldict[args.only_layer]}
 
         LOGGER.info('Masking data')
         mask = np.where(fmap_valid & data_valid)
@@ -229,7 +228,7 @@ if __name__ == "__main__":
         LOGGER.info('Masking layer annotation')
         layval = lay.raw[mask]
         for k, v in ldict.items():
-            LOGGER.info('Generating and saving image for Layer{} ({}x{})'.format(v, args.flatpix, args.flatpix))
+            LOGGER.info('Generating and saving image for Layer {} ({}x{})'.format(v, args.flatpix, args.flatpix))
             lmask = np.where(layval == k)
             img, agg = func(flatpos[lmask], flatval[lmask], cmap, args.flatpix, **kwargs)
             LOGGER.info('Min: {} Max: {}'.format(np.nanmin(agg.values), np.nanmax(agg.values)))
