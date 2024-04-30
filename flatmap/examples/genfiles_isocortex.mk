@@ -12,6 +12,28 @@ ALL_OUTPUTS := $(OUTPUT_DIR)/annotations.nrrd $(OUTPUT_DIR)/mask.nrrd $(OUTPUT_D
 .PHONY: all
 all: $(ALL_OUTPUTS)
 
+# layers
+$(OUTPUT_DIR)/layers.nrrd: $(OUTPUT_DIR)/isocortex_annotation_10.nrrd $(OUTPUT_DIR)/1_layersfix.json
+	$(ECHO) -e "\
+import numpy as np                                   \n\
+from voxcell import VoxelData, RegionMap             \n\
+annot = VoxelData.load_nrrd('$<')                    \n\
+rmap = RegionMap.load_json('$(word 2,$^)')           \n\
+zids = np.unique(annot.raw)                          \n\
+ids = zids                                           \n\
+if zids[0] == 0:                                     \n\
+    ids = zids[1:]                                   \n\
+names = [rmap.get(x,'name') for x in list(ids)]      \n\
+pos = [x.index('layer ') if 'layer ' in x else -1 for x in names]\n\
+lstr = [x[i+len('layer '):] if i > 0 else '0' for (x,i) in zip(names,pos)]\n\
+ldict = {'0':0,'1':1,'2/3':2,'4':4,'5':5,'6a':6,'6b':6}\n\
+lay = np.array([0] + [ldict[x] for x in lstr])       \n\
+sort_idx = np.argsort(zids)                          \n\
+idx = np.searchsorted(zids,annot.raw,sorter = sort_idx)\n\
+out = lay[sort_idx][idx]                             \n\
+annot.with_data(out.astype('uint8')).save_nrrd('$@') \n\
+" | $(PYTHON)
+
 # outside, inside, sides, bottom, top
 $(OUTPUT_DIR)/mask.nrrd: $(OUTPUT_DIR)/mask_hemi.nrrd $(CCFV3_INPUT_DIR)/isocortex_mask_10.nrrd $(CCFV3_INPUT_DIR)/isocortex_boundary_10.nrrd | $(OUTPUT_DIR)/
 	$(ECHO) -e "\
@@ -27,7 +49,7 @@ bnd.raw[hem.raw == 0] = 0                            \n\
 bnd.with_data(bnd.raw.astype(np.int8)).save_nrrd('$@')\n\
 " | $(PYTHON)
 
-# isocortex regions in one hemisphere
+# isocortex regions in one hemisphere (0-based)
 $(OUTPUT_DIR)/annotations.nrrd: $(OUTPUT_DIR)/mask_hemi.nrrd $(OUTPUT_DIR)/isocortex_regions_10.nrrd | $(OUTPUT_DIR)/
 	$(ECHO) -e "\
 import numpy as np                                   \n\

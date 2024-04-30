@@ -215,7 +215,7 @@ if __name__ == "__main__":
             ldict = {args.only_layer: ldict[args.only_layer]}
 
         lay = None
-        if args.split:
+        if args.split or args.only_layer is not None:
             LOGGER.info('Loading layer annotation')
             lay = VoxelData.load_nrrd(args.layers)
             assert(lay.shape == dat.shape)
