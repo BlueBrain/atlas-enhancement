@@ -2,14 +2,14 @@
 
 ## Code
 
-Contents:
+### Contents
 
 + `flatpath`: C code to compute streamlines and streamline-derived quantities.
 + `metrics`: Python code to compute flatmap metrics.
 + `surf_cgal`: C++ code using CGAL to work with meshes (flattening, etc.).
 + `utils`: Python helper scripts to perform various tasks.
 
-To compile:
+### Compilation
 
 1. Gather dependencies (listed below).
 2. Change directory to `code`.
@@ -18,7 +18,9 @@ To compile:
 
 ## Workflow
 
-Stages:
+### Stages
+
+The flatmapping workflow is implemented using Makefiles. Each stage has multiple steps, each with clearly defined `input` and `output` files. The workflow is designed to be self-contained, and no user modification of files is required (except possibly paths to binaries in `config.mk`).
 
 + `01_stageI`: run stage I "flat mesh generation", independent from stage II.
 + `02_stageII`: run stage II "voxel projection", independent from stage I.
@@ -27,9 +29,7 @@ Stages:
 + `metrics`: compute metrics for flatmap characterization, with the flatmap generated in stage III.
 + `applications`: implement applications of flatmaps, with the flatmap generated in stage III.
 
-The flatmapping workflow is implemented using Makefiles. Each stage has multiple steps, each with clearly defined `input` and `output` files. The workflow is designed to be self-contained, and no user modification of files is required (except possibly paths to binaries in `config.mk`).
-
-To create a flatmap:
+### Flatmap generation
 
 1. Fire up a terminal.
 2. Clone this repository.
@@ -39,6 +39,28 @@ To create a flatmap:
 6. Set the environment variable `USER_DATA_ROOT` to the location of the directory containing the input files.
 7. Change directory to `$ATLAS_ENHANCEMENT_ROOT/flatmap/workflow`.
 8. Run `make`!
+
+### Data visualization in flat space / flat view generation
+
+Input data must be in NRRD format with same dimensions as flatmap, e.g. data registered to CCFv3 at 10 μm when using mouse isocortex flatmap at 10 μm.
+
+As part of the workflow:
+
+1. Change directory to `applications/flatview_3d_data`.
+2. Run `make FLATVIEW_DATA_INPUT_FILE="<path to input data>"`.
+3. Extra arguments to `flatplot` can be passed in `FLATPLOT_DATA_EXTRA`.
+4. Find output image under `output/`.
+
+Stand-alone:
+
+1. Run `$ATLAS_ENHANCEMENT_ROOT/flatmap/code/bin/flatplot <flatmap NRRD> <data NRRD> <output prefix>`.
+2. Some common options are:
+   + `--flatpix`: specify pixel resolution of output image
+   + `--autospan`: get value range from data, instead of [0,1]
+   + `--colormap`: set color map from `colorcet` as `cet:*`, from `seaborn` as `sns:*`, from `cmcrameri` as `cmc:*`, or as a comma-separated list of hexadecimal RGB colors (`#XXXXXX`)
+   + `--reduction`: specify aggregation function, e.g. `max`, `mean`, etc.
+   + `--layers`: path to layers NRRD (1-based integers), to be used with `--split` to plot each layer separately, or `--only-layer` to plot a specific layer.
+4. For full CLI options, run `flatplot` with no arguments.
 
 ### Input file requirements
 
