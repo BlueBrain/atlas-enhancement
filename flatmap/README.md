@@ -4,10 +4,10 @@
 
 Contents:
 
-+ `flatpath`: C code to compute streamline-related tasks.
++ `flatpath`: C code to compute streamlines and streamline-derived quantities.
 + `metrics`: Python code to compute flatmap metrics.
-+ `surf_cgal`: C++ code for CGAL-powered code to work with meshes.
-+ `utils`: mostly Python scripts and two AWK helper scripts to perform various tasks.
++ `surf_cgal`: C++ code using CGAL to work with meshes (flattening, etc.).
++ `utils`: Python helper scripts to perform various tasks.
 
 To compile:
 
@@ -18,15 +18,16 @@ To compile:
 
 ## Workflow
 
-Contents (stages):
+Stages:
 
 + `01_stageI`: run stage I "flat mesh generation", independent from stage II.
 + `02_stageII`: run stage II "voxel projection", independent from stage I.
 + `03_stageIII`: run stage III "flatmap generation", depends on stages I and II.
-+ `metrics`: run metrics for flatmap characterization, with the flatmap generated in stage III.
-+ `applications`: run applications of flatmaps, with the flatmap generated in stage III.
++ `postproc`: perform post-processing tasks, with the flatmap generated in stage III.
++ `metrics`: compute metrics for flatmap characterization, with the flatmap generated in stage III.
++ `applications`: implement applications of flatmaps, with the flatmap generated in stage III.
 
-The flatmapping workflow is implemented using Makefiles. Each stage has multiple steps, each with clearly defined `input` and `output` files. The workflow is designed to be self-contained, and no user modification of files is required (except paths to optional programs in `config.mk`).
+The flatmapping workflow is implemented using Makefiles. Each stage has multiple steps, each with clearly defined `input` and `output` files. The workflow is designed to be self-contained, and no user modification of files is required (except possibly paths to binaries in `config.mk`).
 
 To create a flatmap:
 
@@ -41,13 +42,14 @@ To create a flatmap:
 
 ### Input file requirements
 
-+ `config.mk`: configuration file tuning the flatmapping algorithm. Use the provided `user_config_sscx.mk` or `user_config_isocortex.mk` as examples.
-+ `relative_depth.nrrd`: relative depth field as 32-bit floating-point (float) NRRD dataset. Values must be 1 at the top shell and 0 at the bottom shell. Background value must be NaN.
-+ `orientation_{x,y,z}.nrrd`: components of the local orientation vector as 32-bit floating-point (float) NRRD datasets. Background value must be 0. The vector must point towards the top shell (where `relative_depth.nrrd` is 1).
-+ `annotations.nrrd` (optional): region labels as an integer NRRD dataset. Used to visualize the flatmap in `applications/flatview_annotations`.
-+ `mask.nrrd` (optional): labeling of inner (1) and outer (0) voxels, and top (4) / sides (2) / bottom (3) shells, as an integer NRRD dataset.
+NRRD datasets must include voxel dimensions and space origin metadata, and must have the same data dimensions. Check files in Zenodo repo for examples. Preferably generate/save these files using the Python package `voxcell`.
 
-+ NRRD datasets must include voxel dimensions and space origin metadata, and must have the same data dimensions. Check files in Zenodo repo for examples. Preferably generate/save these files using the Python package `voxcell`.
++ `config.mk`: configuration file for the flatmapping algorithm. For example, see the provided [user_config_sscx.mk](examples/user_config_sscx.mk) or [user_config_isocortex.mk](examples/user_config_isocortex.mk).
++ `relative_depth.nrrd`: relative depth field as 32-bit floating-point NRRD dataset. Values must be 1 at the top shell and 0 at the bottom shell. Background value must be NaN.
++ `orientation_{x,y,z}.nrrd`: components of the local orientation vector as 32-bit floating-point NRRD datasets. Background value must be 0. The vector must point towards the top shell (where `relative_depth.nrrd` is 1).
++ `annotations.nrrd` (optional): sequential region labels as an integer NRRD dataset. Used to visualize region annotations in flat space in `applications/flatview_annotations`.
++ `mask.nrrd` (optional): labeling of inner (1) and outer (0) voxels, and top (4) / sides (2) / bottom (3) shells, as an integer NRRD dataset.
++ `hemispheres.nrrd` (optional): labeling of right (1) and left (2) hemispheres, as an integer NRRD dataset. Used to mirror flatmaps in `postproc/both_hemispheres`.
 
 ## Dependencies
 
@@ -65,8 +67,8 @@ To create a flatmap:
 
 ## Optional dependencies
 
-+ Intel MKL (proprietary), to speed up iterative flattening algorithm.
-+ GNU Parallel (`parallel`), to compute streamlines in parallel across a cluster.
++ Intel MKL (proprietary), to speed up iterative mesh flattening.
++ GNU Parallel (`parallel`), to compute streamlines in parallel.
 + gnuplot (`gnuplot`), to view diagnostic plots.
-+ Some image viewer, to view generated heatmaps.
++ Some image viewer (e.g., `feh`), to view generated heatmaps.
 + Some NRRD viewer (e.g., `xgrid3d` or `itk-snap`), to view generated NRRD datasets.
