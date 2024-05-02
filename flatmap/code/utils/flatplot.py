@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
 # AUTHOR: Sirio Bolaños Puchet <sirio.bolanospuchet@epfl.ch>
 # CREATION DATE: 2023-05-30
-# LAST MODIFICATION: 2024-02-22
+# LAST MODIFICATION: 2024-05-02
 
 _PROGNAME = 'flatplot'
 
