@@ -64,6 +64,7 @@ STAGE_II_ROOT := $(WORKFLOW_ROOT)/02_stageII
 STAGE_III_ROOT := $(WORKFLOW_ROOT)/03_stageIII
 METRICS_ROOT := $(WORKFLOW_ROOT)/metrics
 APPLICATIONS_ROOT := $(WORKFLOW_ROOT)/applications
+POSTPROC_ROOT := $(WORKFLOW_ROOT)/postproc
 
 ## steps
 FLATMAP_STEPS := 01_stageI\
@@ -113,4 +114,6 @@ VOXEL_PROJECTIONS_POSITION_FILE := voxel_projections_position.xyz
 NEAREST_VERTICES_FILE := nearest_vertices.txt
 FLATMAP_FILE := flatmap.txt
 FLATMAP_NRRD_FILE := flatmap.nrrd
+FLATMAP_BOTH_NRRD_FILE := flatmap_both.nrrd
 FLATMAP_DISCRETE_NRRD_FILE := flatmap_discrete.nrrd
+FLATMAP_BOTH_DISCRETE_NRRD_FILE := flatmap_both_discrete.nrrd

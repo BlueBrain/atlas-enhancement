@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # AUTHOR: Sirio Bolaños Puchet <sirio.bolanospuchet@epfl.ch>
 # CREATION DATE: 2023-05-30
-# LAST MODIFICATION: 2024-05-02
+# LAST MODIFICATION: 2024-05-13
 
 _PROGNAME = 'flatplot'
 
@@ -68,25 +68,26 @@ import flatmap_util as fmutil
 import colorcet
 
 
-def flatplot(flatpos, flatval, cmap=colorcet.gray, flatpix=256, reduction=ds.max, how='linear',
-             span=(0, 1), dual=False):
+def flatplot(flatpos, flatval, cmap=colorcet.gray, flatpix=256, reduction=ds.max,
+             how='linear', span=(0, 1), dual=False):
     import pandas as pd
-    plot_width = 2 * flatpix if dual else flatpix
-    x_range = (0,2) if dual else (0,1)
-    cvs = ds.Canvas(plot_width=plot_width, plot_height=flatpix, x_range=x_range, y_range=(0,1))
-    df = pd.DataFrame(flatpos, columns=('x','y'))
+    x_range = (0, 2) if dual else (0, 1)
+    width = 2 * flatpix if dual else flatpix
+    cvs = ds.Canvas(plot_width=width, plot_height=flatpix, x_range=x_range, y_range=(0, 1))
+    df = pd.DataFrame(flatpos, columns=('x', 'y'))
     df['val'] = flatval  # set column while keeping data type
-    agg = cvs.points(df,'x','y',reduction('val'))
+    agg = cvs.points(df, 'x', 'y', reduction('val'))
     return tf.shade(agg, how=how, cmap=cmap, span=span), agg
 
 
 def flatplot_dots(flatpos, flatval, cmap='#000000', flatpix=256, how='eq_hist', spread=None,
                   dual=False):
     import pandas as pd
-    x_range = (0,2) if dual else (0,1)
-    cvs = ds.Canvas(plot_width=flatpix, plot_height=flatpix, x_range=x_range, y_range=(0,1))
-    df = pd.DataFrame(flatpos, columns=('x','y'))
-    agg = cvs.points(df,'x','y')
+    x_range = (0, 2) if dual else (0, 1)
+    width = 2 * flatpix if dual else flatpix
+    cvs = ds.Canvas(plot_width=width, plot_height=flatpix, x_range=x_range, y_range=(0, 1))
+    df = pd.DataFrame(flatpos, columns=('x', 'y'))
+    agg = cvs.points(df, 'x', 'y')
     if spread is not None:
         return tf.shade(tf.spread(agg, px=spread), cmap=cmap, how=how), agg
     else:
@@ -98,7 +99,8 @@ def get_mode(vals):
     return x[np.argmax(c)]
 
 
-def flatplot_regions(flatpos, flatval, cmap=colorcet.glasbey, flatpix=256, valbkg=-1):
+def flatplot_regions(flatpos, flatval, cmap=colorcet.glasbey, flatpix=256, valbkg=-1,
+                     dual=False):
     from collections import defaultdict
     import xarray as xr
     try:
@@ -117,7 +119,7 @@ def flatplot_regions(flatpos, flatval, cmap=colorcet.glasbey, flatpix=256, valbk
     # compute mode of values per pixel
     d = defaultdict(list)
     for x, y, z in idat:
-        d[(x,y)].append(z)
+        d[(x, y)].append(z)
     if has_parallel:
         with parallel_config(backend='threading', n_jobs=cpu_count()):
             result = Parallel()(delayed(get_mode)(v) for v in d.values())
@@ -125,15 +127,17 @@ def flatplot_regions(flatpos, flatval, cmap=colorcet.glasbey, flatpix=256, valbk
         result = [get_mode(v) for v in d.values()]
     dmode = {k: result[i] for i, k in enumerate(d.keys())}
     # setup raster
-    arr = np.full((flatpix,flatpix), np.nan, dtype='float32')
-    for k,v in dmode.items():
+    width = 2 * flatpix if dual else flatpix
+    arr = np.full((width, flatpix), np.nan, dtype='float32')
+    for k, v in dmode.items():
         arr[k] = v
     # correct orientation
     arr = np.rot90(np.flipud(arr), -1)
     # plot
-    cvs = ds.Canvas(plot_width=flatpix, plot_height=flatpix)
-    xs = ys = np.linspace(0, 1, flatpix)
-    x = xr.DataArray(arr,coords=[('y', ys), ('x', xs)])
+    cvs = ds.Canvas(plot_width=width, plot_height=flatpix)
+    xs = np.linspace(0, 1, width)
+    ys = np.linspace(0, 1, flatpix)
+    x = xr.DataArray(arr, coords=[('y', ys), ('x', xs)])
     agg = cvs.raster(x)
     return tf.shade(agg, how='linear', cmap=cmap, span=(0, len(cmap) - 1)), agg
 
@@ -143,13 +147,13 @@ def str_to_reduction(s):
         return ds.max
     elif s in ['min']:
         return ds.min
-    elif s in ['avg','mean']:
+    elif s in ['avg', 'mean']:
         return ds.mean
     elif s in ['sum']:
         return ds.sum
     elif s in ['mode']:
         return ds.mode
-    elif s in ['std','sd']:
+    elif s in ['std', 'sd']:
         return ds.std
     elif s in ['var']:
         return ds.var
@@ -172,6 +176,7 @@ if __name__ == "__main__":
     if args.regions:
         func = flatplot_regions
         kwargs.update({'valbkg': args.regions_background})
+        kwargs.update({'dual': args.dual})
     elif args.dots:
         func = flatplot_dots
         kwargs.update({'spread': args.spread})
@@ -185,6 +190,7 @@ if __name__ == "__main__":
     LOGGER.info('Loading flat map "{}"'.format(args.flatmap))
     fmap, fmap_valid = fmutil.load_flatmap(args.flatmap)
 
+    lay = None
     if args.dots:
         LOGGER.info('Loading dots "{}"'.format(args.dataset))
         dots = np.loadtxt(args.dataset)
@@ -203,13 +209,12 @@ if __name__ == "__main__":
 
         data_valid = True
         if args.mask is not None:
-            LOGGER.info('Loading data mask "{}"'.format(args.mask))
+            LOGGER.info('Loading mask "{}"'.format(args.mask))
             dmsk = VoxelData.load_nrrd(args.mask)
             assert(dmsk.shape == dat.shape)
             data_valid = (dmsk.raw != 0)
             del dmsk
 
-        lay = None
         if args.split or args.only_layer is not None:
             LOGGER.info('Loading layer annotation "{}"'.format(args.layers))
             lay = VoxelData.load_nrrd(args.layers)
@@ -225,17 +230,18 @@ if __name__ == "__main__":
         flatpos = fmap.raw[mask]
         flatval = dat.raw[mask]
 
+    img_w = 2 * args.flatpix if args.dual else args.flatpix
     if lay is not None:
         LOGGER.info('Masking layer annotation')
         layval = lay.raw[mask]
         for k, v in ldict.items():
-            LOGGER.info('Generating and saving image for Layer {} ({}x{})'.format(v, args.flatpix, args.flatpix))
+            LOGGER.info('Generating and saving image for Layer {} ({}x{})'.format(v, img_w, args.flatpix))
             lmask = np.where(layval == k)
             img, agg = func(flatpos[lmask], flatval[lmask], cmap, args.flatpix, **kwargs)
             LOGGER.info('Min: {} Max: {}'.format(np.nanmin(agg.values), np.nanmax(agg.values)))
             ds.utils.export_image(img, '{}_Layer{}'.format(args.output_prefix, v), background=None, _return=False)
     else:
-        LOGGER.info('Generating and saving image ({}x{})'.format(args.flatpix, args.flatpix))
+        LOGGER.info('Generating and saving image ({}x{})'.format(img_w, args.flatpix))
         img, agg = func(flatpos, flatval, cmap, args.flatpix, **kwargs)
         LOGGER.info('Min: {} Max: {}'.format(np.nanmin(agg.values), np.nanmax(agg.values)))
         ds.utils.export_image(img, args.output_prefix, background=None, _return=False)

@@ -6,8 +6,6 @@ STEPS := both_hemispheres\
 DEFAULT_STEPS :=
 
 ## file names
-FLATMAP_BOTH_NRRD_FILE := flatmap_both.nrrd
-FLATMAP_BOTH_DISCRETE_NRRD_FILE := flatmap_both_discrete.nrrd
 FLATMAP_SPLIT_X_NRRD_FILE := flat_x.nrrd
 FLATMAP_SPLIT_Y_NRRD_FILE := flat_y.nrrd
 FLATMAP_SPLIT_X_DISCRETE_NRRD_FILE := flat_discrete_x.nrrd
