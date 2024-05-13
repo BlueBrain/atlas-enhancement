@@ -23,6 +23,8 @@ STEPS := $(GLOBAL_STEPS)\
 		 $(PER_VERTEX_STEPS)\
 		 $(PER_PIXEL_STEPS)\
 		 $(PER_VOXEL_STEPS)\
+		 pixel_metric\
+		 per_voxel\
 		 heatmaps
 
 DEFAULT_STEPS := $(STEPS)
@@ -35,14 +37,16 @@ METRICS_USAGE_FRACTION_DISCRETE_FILE := usage_fraction_discrete.txt
 METRICS_ORTHOGONALITY_NRRD_FILE := orthogonality.nrrd
 METRICS_DIVERGENCE_NRRD_FILE := divergence.nrrd
 METRICS_LAPLACIAN_NRRD_FILE := laplacian.nrrd
+METRICS_PER_VOXEL_PLOT_FILE := per_voxel.png
+METRICS_PIXEL_METRIC_PLOT_FILE := pixel_metric.pdf
 
-METRICS_PREIMAGE_SIZE_DISCRETE_NRRD_FILE := preimage_size_discrete.nrrd
-METRICS_PREIMAGE_SIZE_UNIFORMITY_NRRD_FILE := preimage_size_uniformity.nrrd
-METRICS_PREIMAGE_CONNECTEDNESS_NRRD_FILE := preimage_connectedness.nrrd
-METRICS_PAIRWISE_PREIMAGE_CONTINUITY_NRRD_FILE := pairwise_preimage_continuity.nrrd
-METRICS_PREIMAGE_GEOMETRY_NRRD_FILE := preimage_geometry.nrrd
-METRICS_PREIMAGE_RADIUS_NRRD_FILE := preimage_radius.nrrd
-METRICS_PREIMAGE_CONICITY_NRRD_FILE := preimage_conicity.nrrd
+METRICS_PREIMAGE_SIZE_DISCRETE_NRRD_FILE = preimage_size_discrete_$1.nrrd
+METRICS_PREIMAGE_SIZE_UNIFORMITY_NRRD_FILE = preimage_size_uniformity_$1.nrrd
+METRICS_PREIMAGE_CONNECTEDNESS_NRRD_FILE = preimage_connectedness_$1.nrrd
+METRICS_PAIRWISE_PREIMAGE_CONTINUITY_NRRD_FILE = pairwise_preimage_continuity_$1.nrrd
+METRICS_PREIMAGE_GEOMETRY_NRRD_FILE = preimage_geometry_$1.nrrd
+METRICS_PREIMAGE_RADIUS_NRRD_FILE = preimage_radius_$1.nrrd
+METRICS_PREIMAGE_CONICITY_NRRD_FILE = preimage_conicity_$1.nrrd
 
 METRICS_DISCRETE := PAIRWISE_PREIMAGE_CONTINUITY\
 					PREIMAGE_CONICITY\

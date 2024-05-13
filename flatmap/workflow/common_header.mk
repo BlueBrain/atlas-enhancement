@@ -26,5 +26,6 @@ endif
 endef
 $(eval $(call required,$(PYTHON3)))
 
+.PHONY: setup all
 setup: $(INPUTS)
 all: $(OUTPUTS)

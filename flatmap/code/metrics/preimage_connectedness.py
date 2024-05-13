@@ -17,9 +17,13 @@ ncpu = cpu_count() // 2
 if len(sys.argv) > 4:
     ncpu = int(sys.argv[4])
 
-# load flat map
-fmap_vd = VoxelData.load_nrrd(flatmap_nrrd)
+# load and discretize flat map
+fmap_vd, fmask = fmutil.load_flatmap(flatmap_nrrd)
+fmap_d = fmutil.discretize_flatmap(fmap_vd, fmask, pixel_res)
+fmap_vd = VoxelData(fmap_d, (1, 1))
+del fmask
 
+# get pre-images
 voxels = fmutil.get_preimages_vox(fmap_vd, pixel_res)
 del fmap_vd  # FREE
 

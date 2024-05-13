@@ -6,23 +6,6 @@ input_nrrd = sys.argv[1]
 pixel_res = int(sys.argv[2])
 output_nrrd = sys.argv[3]
 
-# smallest needed data type
-if pixel_res > 2 ** 31 - 1:
-    dtype = np.dtype('i8')
-elif pixel_res > 2 ** 15 - 1:
-    dtype = np.dtype('i4')
-elif pixel_res > 2 ** 7 - 1:
-    dtype = np.dtype('i2')
-else:
-    dtype = np.dtype('i1')
-
 fmap, fmask = fmutil.load_flatmap(input_nrrd)
-fx_d, fy_d = fmutil.get_discrete_flat_coordinates(fmap.raw, pixel_res, fmask)
-fmap_d = np.full_like(fmap.raw, -1, dtype=dtype)
-fmap_d[:,:,:,0][fmask] = fx_d
-fmap_d[:,:,:,1][fmask] = fy_d
-
-assert(np.all((fmap_d[:,:,:,0] > -1) == fmask))
-assert(np.all((fmap_d[:,:,:,1] > -1) == fmask))
-
+fmap_d = fmutil.discretize_flatmap(fmap, fmask, pixel_res)
 fmap.with_data(fmap_d).save_nrrd(output_nrrd)

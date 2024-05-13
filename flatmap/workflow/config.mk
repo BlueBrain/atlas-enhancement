@@ -42,8 +42,9 @@ EXPR := expr
 PASTE := paste
 endif
 
-# path to Python 3
+# paths to interpreters
 PYTHON3 := python3
+RSCRIPT := Rscript
 
 # path to GNU parallel
 PARALLEL := parallel
@@ -54,6 +55,8 @@ GEOMVIEW := geomview
 IMAGE_VIEWER := feh
 NRRD_VIEWER := xgrid3d -nosel
 NRRD_EDITOR := xgrid3d
+PDF_VIEWER := pdfview
+PAGER ?= less
 
 # DO NOT EDIT BELOW THIS LINE
 STAGE_I_ROOT := $(WORKFLOW_ROOT)/01_stageI

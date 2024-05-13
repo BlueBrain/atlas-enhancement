@@ -6,4 +6,7 @@ output/$(METRICS_COVERAGE_FILE): input/$(FLATMAP_NRRD_FILE) input/$(RELATIVE_DEP
 # input links
 input/$(FLATMAP_NRRD_FILE): SRC := $(STAGE_III_ROOT)/02_flatmap/output/$(FLATMAP_NRRD_FILE)
 
+# auxiliary commands
+view: view-txt
+
 include ../../common_footer.mk

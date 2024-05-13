@@ -25,6 +25,14 @@ view-nrrd:
 view-image:
 	$(foreach o,$(OUTPUTS),$(IMAGE_VIEWER) $o;)
 
+.PHONY: view-txt
+view-txt:
+	$(foreach o,$(OUTPUTS),$(PAGER) $o;)
+
+.PHONY: view-pdf
+view-pdf:
+	$(foreach o,$(OUTPUTS),$(PDF_VIEWER) $o;)
+
 # cleanup
 .PHONY: clean clean-all clean-inputs clean-outputs
 clean-input:
