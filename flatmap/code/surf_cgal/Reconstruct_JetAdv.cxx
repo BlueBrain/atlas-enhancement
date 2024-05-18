@@ -8,6 +8,10 @@
 #include <CGAL/IO/read_xyz_points.h>
 #include <CGAL/Timer.h>
 
+#include <CGAL/Surface_mesh.h>
+#include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
+#include <CGAL/Polygon_mesh_processing/connected_components.h>
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 
 typedef CGAL::Scale_space_surface_reconstruction_3<Kernel>                 Reconstruction;
@@ -17,6 +21,9 @@ typedef CGAL::Scale_space_reconstruction_3::Advancing_front_mesher<Kernel> Meshe
 typedef Kernel::Point_3                                     Point;
 
 typedef Reconstruction::Facet_const_iterator                Facet_iterator;
+
+typedef CGAL::Surface_mesh<Point>                           SurfaceMesh;
+typedef boost::graph_traits<SurfaceMesh>::face_descriptor   face_descriptor;
 
 typedef CGAL::Timer Timer;
 
@@ -64,11 +71,36 @@ int main(int argc, char** argv)
 
     Reconstruction reconstruct = pts2surf(points,neigh,degfit,degmon);
 
-    // Write the mesh
     const char *outfile = (argc > 2) ? argv[2] : "out.off";
-    std::ofstream out (outfile);
-    out << reconstruct;
-    std::cerr << "Done saving as " << outfile << std::endl;
+    { // Write the mesh
+        std::ofstream out (outfile);
+        out << reconstruct;
+        std::cerr << "Done saving as " << outfile << std::endl;
+    }
+
+    // Load back with repair
+    SurfaceMesh mesh;
+    if(!CGAL::Polygon_mesh_processing::IO::read_polygon_mesh(outfile, mesh))
+    {
+        std::cerr << "Failed loading back mesh" << std::endl;
+        return 1;
+    }
+
+    SurfaceMesh::Property_map<face_descriptor, std::size_t> fccmap =
+        mesh.add_property_map<face_descriptor, std::size_t>("f:CC").first;
+    std::size_t numcc = CGAL::Polygon_mesh_processing::connected_components(mesh, fccmap);
+    std::cerr << "Have " << numcc << " connected components" << std::endl;
+
+    if(numcc > 1) {
+        std::size_t nrem = CGAL::Polygon_mesh_processing::keep_largest_connected_components(mesh, 1);
+        std::cerr << "Keeping largest connected component (" << nrem << "removed)" << std::endl;
+    }
+
+    { // Write mesh again
+        std::ofstream out (outfile);
+        out << mesh;
+        std::cerr << "Done saving back as " << outfile << std::endl;
+    }
 
     return EXIT_SUCCESS;
 }

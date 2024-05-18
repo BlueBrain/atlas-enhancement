@@ -4,9 +4,6 @@ ALL_BIN := surf_cgal/build/Reconstruct_PCAlpha\
 all: $(ALL_BIN)
 
 surf_cgal/build/Reconstruct_PCAlpha:
-ifndef CGAL_ROOT
-$(error Please set CGAL_ROOT to the location of CGAL source code)
-endif
 	cd surf_cgal && $(MAKE) compile
 
 surf_scal/build_mkl/FlattenAuthalic_Iterative:

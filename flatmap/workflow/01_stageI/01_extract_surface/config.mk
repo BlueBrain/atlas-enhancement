@@ -1,6 +1,6 @@
 # paths to executables
 EXTRACT_ISOSURFACE_VOXELS_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/extract_iso_voxels.py
-EXTRACT_DOTS_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/extract_dots.py
+EXTRACT_DOTS_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/extract_dots_largest_cc.py
 
 # DO NOT EDIT BELOW THIS LINE
 override INPUTS := input/$(RELATIVE_DEPTH_FILE)
