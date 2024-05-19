@@ -87,9 +87,18 @@ NRRD datasets must include voxel dimensions and space origin metadata, and must 
 + GMSH (`gmsh`, [website](http://gmsh.info))
 + Python packages in `requirements.txt`
 
+### Custom convex border parameterization in CGAL
+
+Requires copying the following files from [my branch](https://github.com/seirios/cgal/tree/border-parameterization/Surface_mesh_parameterization/include/CGAL/Surface_mesh_parameterization) (until https://github.com/CGAL/cgal/pull/8180 is merged):
+
++ `Convex_border_parameterizer_3.h`
++ `Parametric_curve_border_parameterizer_3.h`
+
+into `include/CGAL/Surface_mesh_parameterization` in the CGAL source distribution.
+
 ## Optional dependencies
 
-+ Intel MKL (proprietary), to speed up iterative mesh flattening.
++ Intel MKL (proprietary), to speed up iterative mesh flattening with PARDISO solver.
 + GNU Parallel (`parallel`), to compute streamlines in parallel.
 + gnuplot (`gnuplot`), to view diagnostic plots.
 + Some image viewer (e.g., `feh`), to view generated heatmaps.
