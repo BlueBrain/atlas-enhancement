@@ -10,6 +10,7 @@
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Polygon_mesh_processing/IO/polygon_mesh_io.h>
 #include <CGAL/Polygon_mesh_processing/connected_components.h>
+#include <CGAL/Polygon_mesh_processing/repair.h>
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 
@@ -23,6 +24,7 @@ typedef Reconstruction::Facet_const_iterator                Facet_iterator;
 
 typedef CGAL::Surface_mesh<Point>                           SurfaceMesh;
 typedef boost::graph_traits<SurfaceMesh>::face_descriptor   face_descriptor;
+typedef boost::graph_traits<SurfaceMesh>::vertex_descriptor vertex_descriptor;
 
 typedef CGAL::Timer Timer;
 
@@ -88,23 +90,37 @@ int main(int argc, char** argv)
     if(!CGAL::Polygon_mesh_processing::IO::read_polygon_mesh(outfile, mesh))
     {
         std::cerr << "Failed loading back mesh" << std::endl;
-        return 1;
+        return EXIT_FAILURE;
     }
+    std::cerr << "Loaded mesh with " << num_vertices(mesh) << " vertices (after repair)." << std::endl;
 
     SurfaceMesh::Property_map<face_descriptor, std::size_t> fccmap =
         mesh.add_property_map<face_descriptor, std::size_t>("f:CC").first;
     std::size_t numcc = CGAL::Polygon_mesh_processing::connected_components(mesh, fccmap);
-    std::cerr << "Have " << numcc << " connected components" << std::endl;
+    std::cerr << "Mesh has " << numcc << " connected components" << std::endl;
 
-    if(numcc > 1) {
+    if(numcc > 1) { // Keep largest connected component only
         std::size_t nrem = CGAL::Polygon_mesh_processing::keep_largest_connected_components(mesh, 1);
         std::cerr << "Keeping largest connected component (" << nrem << "removed)" << std::endl;
     }
 
+    // Count non manifold vertices
+    int counter = 0;
+    for(vertex_descriptor v : vertices(mesh))
+    {
+        if(CGAL::Polygon_mesh_processing::is_non_manifold_vertex(v, mesh))
+        {
+            std::cerr << "vertex " << v << " is non-manifold" << std::endl;
+            ++counter;
+        }
+    }
+    std::cerr << "Mesh has " << counter << " non-manifold vertices" << std::endl;
+    if(counter > 0) return EXIT_FAILURE;
+
     { // Write mesh again
         std::ofstream out (outfile);
         out << mesh;
-        std::cerr << "Done saving back as " << outfile << std::endl;
+        std::cerr << "Done saving back mesh as " << outfile << std::endl;
     }
 
     return EXIT_SUCCESS;

@@ -17,11 +17,10 @@ NREFINE := 3
 FLATTEN_MESH_BIN := $(SOURCE_CODE_ROOT)/surf_cgal/build/Flatten_Authalic_Iterative_convex
 
 ## extra arguments to flattening algorithm (FlattenAuthalicIterative_Convex)
-### border points
+### border points file
 ### number of iterations
 ### offset of first corner along boundary
-### corners .selection.txt file
-FLATTEN_MESH_EXTRA := border_points.txt 10 -1840# offset = -230 * 2 ** NREFINE
+FLATTEN_MESH_EXTRA := input/border_points.txt 10 -1840# offset = -230 * 2 ** NREFINE
 
 ## how many streamlines computed per run?
 FLATPATH_BLOCKSIZE := 100000
