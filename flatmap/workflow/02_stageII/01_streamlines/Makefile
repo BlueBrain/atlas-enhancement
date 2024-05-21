@@ -25,6 +25,8 @@ output/$(VOXEL_PROJECTIONS_FILE): NVOX = $(shell $(HEAD) -1 $(word 5,$^))
 output/$(VOXEL_PROJECTIONS_FILE): NBLOCK = $(shell $(EXPR) $(NVOX) / $(BLOCKSIZE) + \( $(NVOX) % $(BLOCKSIZE) \> 0 \))
 
 ifeq (1,$(PARALLELIZE))
+# to be run from inside `salloc -N<NJOB>+1 ...`
+# with SRUN='srun --mpi=none -N1 -r{%} --exclusive ...'
 NJOB ?= 0
 output/$(VOXEL_PROJECTIONS_FILE): $(CONVERTED_INPUTS) output/$(DIMENSIONS_FILE)
 	$(SEQ) 1 $(NBLOCK) \

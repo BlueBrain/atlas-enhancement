@@ -1,0 +1,21 @@
+# path to executable
+SPLIT_FLATMAP_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/split_coordinates.py
+
+# DO NOT EDIT BELOW THIS LINE
+ifeq (1,$(DISCRETE))
+override INPUTS := input/$(FLATMAP_DISCRETE_NRRD_FILE)
+
+override OUTPUTS := output/$(FLATMAP_SPLIT_X_DISCRETE_NRRD_FILE)\
+	output/$(FLATMAP_SPLIT_Y_DISCRETE_NRRD_FILE)
+
+override USER_PARAMETERS := PIXEL_RESOLUTION
+else
+override INPUTS := input/$(FLATMAP_NRRD_FILE)
+
+override OUTPUTS := output/$(FLATMAP_SPLIT_X_NRRD_FILE)\
+	output/$(FLATMAP_SPLIT_Y_NRRD_FILE)
+
+override USER_PARAMETERS :=
+endif
+
+override USER_BINARIES := SPLIT_FLATMAP_BIN

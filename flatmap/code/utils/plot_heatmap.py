@@ -28,6 +28,8 @@ if __name__ == "__main__":
             help="Color map")
     parser.add_argument("-B", "--bgcolor", default=None,
             help="Image background color (used for NaNs)")
+    parser.add_argument("-z", "--zoom", type=int, default=1,
+            help="Zoom image")
 
     args = parser.parse_args()
 
@@ -52,14 +54,35 @@ def plot_heatmap(array, flatpix, cmap=colorcet.gray, span=None):
     return tf.shade(agg, how='linear', cmap=cmap, span=span), agg
 
 
+# customize datashader image export
+def export_image(img, filename, fmt=".png", _return=True, export_path=".", background="", scaling=1):
+    """Given a datashader Image object, saves it to a disk file in the requested format"""
+
+    from datashader.transfer_functions import set_background
+    from PIL import Image
+    import os
+
+    if not os.path.exists(export_path):
+        os.mkdir(export_path)
+
+    if background:
+        img = set_background(img, background)
+
+    img_pil = img.to_pil()
+    if scaling > 1:
+        img_pil = img_pil.resize(np.array(img_pil.size) * scaling, Image.Resampling.NEAREST)
+    img_pil.save(os.path.join(export_path, filename + fmt))
+    return img if _return else None
+
+
 if __name__ == "__main__":
-    import voxcell as vc
+    from voxcell import VoxelData
     from parse_cmap import parse_cmap
 
     cmap = parse_cmap(args.colormap)
 
     LOGGER.info('Loading input data "{}"'.format(args.input_nrrd))
-    vd = vc.VoxelData.load_nrrd(args.input_nrrd)
+    vd = VoxelData.load_nrrd(args.input_nrrd)
     flatpix = vd.shape[0]
     array = vd.raw
 
@@ -67,7 +90,7 @@ if __name__ == "__main__":
     maxval = np.nanmax(array) if args.maxval is None else args.maxval
     span = [minval, maxval]
 
-    LOGGER.info('Generating and saving image ({}x{})'.format(flatpix,flatpix))
+    LOGGER.info('Generating and saving image ({}x{}) (zoom x{})'.format(flatpix, flatpix, args.zoom))
     img, agg = plot_heatmap(array,flatpix,cmap,span)
     LOGGER.info('Min: {} Max: {}'.format(np.nanmin(agg.values), np.nanmax(agg.values)))
-    ds.utils.export_image(img, args.output_prefix, background=args.bgcolor, _return=False)
+    export_image(img, args.output_prefix, background=args.bgcolor, _return=False, scaling=args.zoom)

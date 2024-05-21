@@ -1,4 +1,4 @@
-import voxcell as vc
+from voxcell import VoxelData
 import numpy as np
 import sys
 
@@ -25,7 +25,7 @@ if argc > 6:
     if not flipx in [0, 1]:
         raise ValueError('Flip vertical must be 0 or 1')
 
-vd = vc.VoxelData.load_nrrd(atlas_nrrd)
+vd = VoxelData.load_nrrd(atlas_nrrd)
 
 fmap = np.full(list(vd.raw.shape) + [2], -1, dtype=np.float32)
 
@@ -57,6 +57,4 @@ if flipy == 1:
     pos[:,1] = fmax - pos[:,1]  # y -> -y
 
 fmap[tuple(np.uint64(w).T)] = pos
-out = vc.VoxelData(fmap,vd.voxel_dimensions,vd.offset)
-
-out.save_nrrd(output_nrrd)
+vd.with_data(fmap).save_nrrd(output_nrrd)

@@ -2,8 +2,8 @@ import numpy as np
 
 
 def load_flatmap(file):
-    import voxcell
-    vd = voxcell.VoxelData.load_nrrd(file)
+    from voxcell import VoxelData
+    vd = VoxelData.load_nrrd(file)
 
     # mask for mapped values
     fx_msk = vd.raw[:,:,:,0] > -1
@@ -17,7 +17,7 @@ def discretize(pos, fxlen):
     fpos = pos.astype(np.float64)
     almost_fxlen = fxlen - 1E-5
     dpos = np.floor(fpos * almost_fxlen).astype(np.int64)
-    assert(np.max(dpos) < fxlen)
+    assert(np.max(dpos) < np.max(fpos) * fxlen)
     assert(np.min(dpos) >= -1)
     return dpos
 
@@ -34,6 +34,29 @@ def get_discrete_flat_coordinates(fmap, fxlen, fmask = None):
         fmask = fx_msk
 
     return discretize(fx[fmask], fxlen), discretize(fy[fmask], fxlen)
+
+
+def minimal_dtype(pixel_res):
+    if pixel_res > 2 ** 31 - 1:
+        return np.dtype('i8')
+    elif pixel_res > 2 ** 15 - 1:
+        return np.dtype('i4')
+    elif pixel_res > 2 ** 7 - 1:
+        return np.dtype('i2')
+    else:
+        return np.dtype('i1')
+
+
+def discretize_flatmap(fmap_vd, fmask, pixel_res):
+    fx_d, fy_d = get_discrete_flat_coordinates(fmap_vd.raw, pixel_res, fmask)
+    fmap_d = np.full_like(fmap_vd.raw, -1, dtype=minimal_dtype(pixel_res))
+    fmap_d[:,:,:,0][fmask] = fx_d
+    fmap_d[:,:,:,1][fmask] = fy_d
+
+    assert(np.all((fmap_d[:,:,:,0] > -1) == fmask))
+    assert(np.all((fmap_d[:,:,:,1] > -1) == fmask))
+
+    return fmap_d
 
 
 def get_preimage_mask_vox(vox):

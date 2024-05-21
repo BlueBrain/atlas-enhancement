@@ -1,6 +1,7 @@
 import hexalattice.hexalattice as hex
 from voxcell import VoxelData
 from scipy.spatial import KDTree
+import flatmap_util as fmutil
 import numpy as np
 import math
 import sys
@@ -18,9 +19,8 @@ if len(sys.argv) > 4:
     hex_n = int(sys.argv[4])
 
 # load flatmap
-fmap = VoxelData.load_nrrd(flatmap_nrrd)
+fmap, msk = fmutil.load_flatmap(flatmap_nrrd)
 vshape = fmap.shape[0:3]
-msk = fmap.raw[:,:,:,0] > -1
 
 # generate hexagonal grid
 hexgrid = hex.create_hex_grid(hex_n,hex_n,hex_diam)[0] + (0.5,0.5)

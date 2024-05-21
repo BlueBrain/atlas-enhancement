@@ -36,6 +36,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 
@@ -44,58 +45,66 @@
 #ifndef info0
 #define info0(M) ((false) ? 0\
         : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[39m","flatpath","INFO",__func__ )\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","INFO",__func__ )))
-#endif
-#ifndef info
-#define info(M, ...) ((false) ? 0\
-        : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[39m","flatpath","INFO",__func__ ,__VA_ARGS__)\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","INFO",__func__ ,__VA_ARGS__)))
-#endif
-#ifndef verbose0
-#define verbose0(M) ((false) ? 0\
-        : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[38;5;12m","flatpath","VERB",__func__ )\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","VERB",__func__ )))
-#endif
-#ifndef verbose
-#define verbose(M, ...) ((false) ? 0\
-        : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[38;5;12m","flatpath","VERB",__func__ ,__VA_ARGS__)\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","VERB",__func__ ,__VA_ARGS__)))
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[39m","flatpath", "INFO"   )\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "INFO"   )))
 #endif
 #ifndef warn0
 #define warn0(M) ((false) ? 0\
         : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[38;5;11m","flatpath","WARN",__func__ )\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","WARN",__func__ )))
-#endif
-#ifndef warn
-#define warn(M, ...) ((false) ? 0\
-        : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[38;5;11m","flatpath","WARN",__func__ ,__VA_ARGS__)\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","WARN",__func__ ,__VA_ARGS__)))
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[38;5;11m","flatpath", "WARN"   )\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "WARN"   )))
 #endif
 #ifndef error0
 #define error0(M) ((false) ? 0\
         : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[38;5;9m","flatpath","ERROR",__func__ )\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","ERROR",__func__ )))
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[38;5;9m","flatpath", "ERROR"   )\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "ERROR"   )))
+#endif
+#ifndef verbose0
+#define verbose0(M) ((false) ? 0\
+        : ((false)\
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[38;5;12m","flatpath", "VERB"   )\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "VERB"   )))
+#endif
+#ifndef debug0
+#define debug0(M) ((false) ? 0\
+        : ((false)\
+            ? fprintf(stderr,"%s[%s] %5s: " "%s: " M "\x1B[39m" "\n","\x1B[38;5;13m","flatpath", "DEBUG" , __func__ )\
+            : fprintf(stderr,"[%s] %5s: " "%s: " M "\n","flatpath", "DEBUG" , __func__ )))
+#endif
+#ifndef info
+#define info(M,...) ((false) ? 0\
+        : ((false)\
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[39m","flatpath", "INFO"   ,__VA_ARGS__)\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "INFO"   ,__VA_ARGS__)))
+#endif
+#ifndef warn
+#define warn(M,...) ((false) ? 0\
+        : ((false)\
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[38;5;11m","flatpath", "WARN"   ,__VA_ARGS__)\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "WARN"   ,__VA_ARGS__)))
 #endif
 #ifndef error
-#define error(M, ...) ((false) ? 0\
+#define error(M,...) ((false) ? 0\
         : ((false)\
-            ? fprintf(stderr,"%s[%s] %5s: %s: " M "\x1B[39m" "\n", "\x1B[38;5;9m","flatpath","ERROR",__func__ ,__VA_ARGS__)\
-            : fprintf(stderr,"[%s] %5s: %s: " M "\n","flatpath","ERROR",__func__ ,__VA_ARGS__)))
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[38;5;9m","flatpath", "ERROR"   ,__VA_ARGS__)\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "ERROR"   ,__VA_ARGS__)))
+#endif
+#ifndef verbose
+#define verbose(M,...) ((false) ? 0\
+        : ((false)\
+            ? fprintf(stderr,"%s[%s] %5s: "  M "\x1B[39m" "\n","\x1B[38;5;12m","flatpath", "VERB"   ,__VA_ARGS__)\
+            : fprintf(stderr,"[%s] %5s: "  M "\n","flatpath", "VERB"   ,__VA_ARGS__)))
+#endif
+#ifndef debug
+#define debug(M,...) ((false) ? 0\
+        : ((false)\
+            ? fprintf(stderr,"%s[%s] %5s: " "%s: " M "\x1B[39m" "\n","\x1B[38;5;13m","flatpath", "DEBUG" , __func__ ,__VA_ARGS__)\
+            : fprintf(stderr,"[%s] %5s: " "%s: " M "\n","flatpath", "DEBUG" , __func__ ,__VA_ARGS__)))
 #endif
 #include <stdint.h>
 #include <math.h>
-#include <errno.h>
 #include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -119,7 +128,7 @@ static inline int strtof_check(const char *str, float out[static 1]) {
 
     *out = val;
 
-    return 0; // alles gut
+    return 0;
 }
 __attribute__ ((unused))
 static inline int strtod_check(const char *str, double out[static 1]) {
@@ -135,7 +144,7 @@ static inline int strtod_check(const char *str, double out[static 1]) {
 
     *out = val;
 
-    return 0; // alles gut
+    return 0;
 }
 __attribute__ ((unused))
 static inline int strtold_check(const char *str, long double out[static 1]) {
@@ -151,17 +160,21 @@ static inline int strtold_check(const char *str, long double out[static 1]) {
 
     *out = val;
 
-    return 0; // alles gut
+    return 0;
 }
+#ifndef strtoumax_check
+#define strtoumax_check(a,b) strtoumax_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoumax_check(const char *str, uintmax_t out[static 1]) {
+static inline int strtoumax_check_base(const char *str, uintmax_t out[static 1], int base) {
     if(NULL == str || '\0' == str[0]) return 1; // invalid input
 
     for(; '\0' != *str && isspace((unsigned char)*str); ++str); // skip leading spaces
     if('\0' == *str || '-' == *str) return 1; // negative sign or empty, invalid input
 
-    int base = ('0' == str[0] && ('x' == str[1] || 'X' == str[1]))
-        ? 16 : 10; // hex or decimal
+    if(base == 1)
+        base = ('0' == str[0] && ('x' == str[1] || 'X' == str[1]))
+             ? 16 : 10; // hex or decimal
 
     errno = 0;
     char *endptr;
@@ -173,88 +186,117 @@ static inline int strtoumax_check(const char *str, uintmax_t out[static 1]) {
 
     *out = val;
 
-    return 0; // alles gut
+    return 0;
 }
 
+#ifndef strtouint_check
+#define strtouint_check(a,b) strtouint_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtouint_check(const char *str, unsigned out[static 1]) {
+static inline int strtouint_check_base(const char *str, unsigned out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)UINT_MAX) return 2; // out of range
     *out = (unsigned)tmp;
     return 0;
 }
+#ifndef strtoul_check
+#define strtoul_check(a,b) strtoul_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoul_check(const char *str, unsigned long out[static 1]) {
+static inline int strtoul_check_base(const char *str, unsigned long out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)ULONG_MAX) return 2; // out of range
     *out = (unsigned long)tmp;
     return 0;
 }
+#ifndef strtoull_check
+#define strtoull_check(a,b) strtoull_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoull_check(const char *str, unsigned long long out[static 1]) {
+static inline int strtoull_check_base(const char *str, unsigned long long out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)ULLONG_MAX) return 2; // out of range
     *out = (unsigned long long)tmp;
     return 0;
 }
+#ifndef strtosize_check
+#define strtosize_check(a,b) strtosize_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtosize_check(const char *str, size_t out[static 1]) {
+static inline int strtosize_check_base(const char *str, size_t out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)SIZE_MAX) return 2; // out of range
     *out = (size_t)tmp;
     return 0;
 }
+#ifndef strtou8_check
+#define strtou8_check(a,b) strtou8_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtou8_check(const char *str, uint8_t out[static 1]) {
+static inline int strtou8_check_base(const char *str, uint8_t out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)UINT8_MAX) return 2; // out of range
     *out = (uint8_t)tmp;
     return 0;
 }
+#ifndef strtou16_check
+#define strtou16_check(a,b) strtou16_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtou16_check(const char *str, uint16_t out[static 1]) {
+static inline int strtou16_check_base(const char *str, uint16_t out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)UINT16_MAX) return 2; // out of range
     *out = (uint16_t)tmp;
     return 0;
 }
+#ifndef strtou32_check
+#define strtou32_check(a,b) strtou32_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtou32_check(const char *str, uint32_t out[static 1]) {
+static inline int strtou32_check_base(const char *str, uint32_t out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)UINT32_MAX) return 2; // out of range
     *out = (uint32_t)tmp;
     return 0;
 }
+#ifndef strtou64_check
+#define strtou64_check(a,b) strtou64_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtou64_check(const char *str, uint64_t out[static 1]) {
+static inline int strtou64_check_base(const char *str, uint64_t out[static 1], const int base) {
     int ret;
     uintmax_t tmp;
-    if((ret = strtoumax_check(str,&tmp))) return ret;
+    if((ret = strtoumax_check_base(str,&tmp,base))) return ret;
     if(tmp > (uintmax_t)UINT64_MAX) return 2; // out of range
     *out = (uint64_t)tmp;
     return 0;
 }
+#ifndef strtoimax_check
+#define strtoimax_check(a,b) strtoimax_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoimax_check(const char *str, intmax_t out[static 1]) {
+static inline int strtoimax_check_base(const char *str, intmax_t out[static 1], int base) {
     if(NULL == str || '\0' == str[0]) return 1; // invalid input
+
+    if(base == 1) base = 10; // default
 
     errno = 0;
     char *endptr;
-    intmax_t val = strtoimax(str,&endptr,10);
+    intmax_t val = strtoimax(str,&endptr,base);
     if(ERANGE == errno && (INTMAX_MIN == val || INTMAX_MAX == val)) return 2; // out of range
     else if(0 != errno && 0 == val) return 1; // invalid input
     else if(endptr == str) return 3; // garbage at start
@@ -262,77 +304,101 @@ static inline int strtoimax_check(const char *str, intmax_t out[static 1]) {
 
     *out = val;
 
-    return 0; // alles gut
+    return 0;
 }
 
+#ifndef strtoint_check
+#define strtoint_check(a,b) strtoint_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoint_check(const char *str, int out[static 1]) {
+static inline int strtoint_check_base(const char *str, int out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)LONG_MIN || tmp > (intmax_t)INT_MAX) return 2; // out of range
     *out = (int)tmp;
     return 0;
 }
+#ifndef strtol_check
+#define strtol_check(a,b) strtol_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtol_check(const char *str, long out[static 1]) {
+static inline int strtol_check_base(const char *str, long out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)LONG_MIN || tmp > (intmax_t)LONG_MAX) return 2; // out of range
     *out = (long)tmp;
     return 0;
 }
+#ifndef strtoll_check
+#define strtoll_check(a,b) strtoll_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoll_check(const char *str, long long out[static 1]) {
+static inline int strtoll_check_base(const char *str, long long out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)LLONG_MIN || tmp > (intmax_t)LLONG_MAX) return 2; // out of range
     *out = (long long)tmp;
     return 0;
 }
+#ifndef strtossize_check
+#define strtossize_check(a,b) strtossize_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtossize_check(const char *str, ssize_t out[static 1]) {
+static inline int strtossize_check_base(const char *str, ssize_t out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)0 || tmp > (intmax_t)SSIZE_MAX) return 2; // out of range
     *out = (ssize_t)tmp;
     return 0;
 }
+#ifndef strtoi8_check
+#define strtoi8_check(a,b) strtoi8_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoi8_check(const char *str, int8_t out[static 1]) {
+static inline int strtoi8_check_base(const char *str, int8_t out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)INT8_MIN || tmp > (intmax_t)INT8_MAX) return 2; // out of range
     *out = (int8_t)tmp;
     return 0;
 }
+#ifndef strtoi16_check
+#define strtoi16_check(a,b) strtoi16_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoi16_check(const char *str, int16_t out[static 1]) {
+static inline int strtoi16_check_base(const char *str, int16_t out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)INT16_MIN || tmp > (intmax_t)INT16_MAX) return 2; // out of range
     *out = (int16_t)tmp;
     return 0;
 }
+#ifndef strtoi32_check
+#define strtoi32_check(a,b) strtoi32_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoi32_check(const char *str, int32_t out[static 1]) {
+static inline int strtoi32_check_base(const char *str, int32_t out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)INT32_MIN || tmp > (intmax_t)INT32_MAX) return 2; // out of range
     *out = (int32_t)tmp;
     return 0;
 }
+#ifndef strtoi64_check
+#define strtoi64_check(a,b) strtoi64_check_base(a,b,1)
+#endif
 __attribute__ ((unused))
-static inline int strtoi64_check(const char *str, int64_t out[static 1]) {
+static inline int strtoi64_check_base(const char *str, int64_t out[static 1], const int base) {
     int ret;
     intmax_t tmp;
-    if((ret = strtoimax_check(str,&tmp))) return ret;
+    if((ret = strtoimax_check_base(str,&tmp,base))) return ret;
     if(tmp < (intmax_t)INT64_MIN || tmp > (intmax_t)INT64_MAX) return 2; // out of range
     *out = (int64_t)tmp;
     return 0;
@@ -353,259 +419,285 @@ void print_usage(void) {
 
     
             printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'V',maxlen,"as-voxels",
+               "      ",'V',
+               maxlen,"as-voxels",
                "     ",
                "  ",
                "interpret input points as voxel indices",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'B',maxlen,"background",
+               "      ",'B',
+               maxlen,"background",
                "<arg>",
                "  ",
                "background value",
-               " [""NAN""]");
+               " [" "NAN" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'D',maxlen,"depth",
+               "      ",'D',
+               maxlen,"depth",
                "     ",
                "  ",
                "compute depth along full streamlines",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'i',maxlen,"dim-x",
+               "      ",'i',
+               maxlen,"dim-x",
                "<arg>",
                "* ",
                "matrix x dimension",
-               " [""0""]");
+               " [" "0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'j',maxlen,"dim-y",
+               "      ",'j',
+               maxlen,"dim-y",
                "<arg>",
                "* ",
                "matrix y dimension",
-               " [""0""]");
+               " [" "0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'k',maxlen,"dim-z",
+               "      ",'k',
+               maxlen,"dim-z",
                "<arg>",
                "* ",
                "matrix z dimension",
-               " [""0""]");
+               " [" "0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'E',maxlen,"epsabs",
+               "      ",'E',
+               maxlen,"epsabs",
                "<arg>",
                "  ",
                "absolute epsilon of ODE solver",
-               " [""1E-3""]");
+               " [" "1E-3" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'1',maxlen,"epsilon-one",
+               "      ",'1',
+               maxlen,"epsilon-one",
                "<arg>",
                "  ",
                "near-one epsilon",
-               " [""1E-2""]");
+               " [" "1E-2" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'0',maxlen,"epsilon-zero",
+               "      ",'0',
+               maxlen,"epsilon-zero",
                "<arg>",
                "  ",
                "near-zero epsilon",
-               " [""1E-2""]");
+               " [" "1E-2" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'e',maxlen,"epsrel",
+               "      ",'e',
+               maxlen,"epsrel",
                "<arg>",
                "  ",
                "relative epsilon of ODE solver",
-               " [""1E-3""]");
+               " [" "1E-3" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'f',maxlen,"file",
+               "      ",'f',
+               maxlen,"file",
                "<arg>",
                "  ",
                "input file with streamline initial points",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'l',maxlen,"file-rdepth",
+               "      ",'l',
+               maxlen,"file-rdepth",
                "<arg>",
                "  ",
                "matrix with relative depth information",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'x',maxlen,"file-x",
+               "      ",'x',
+               maxlen,"file-x",
                "<arg>",
                "* ",
                "matrix with normals x component",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'y',maxlen,"file-y",
+               "      ",'y',
+               maxlen,"file-y",
                "<arg>",
                "* ",
                "matrix with normals y component",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'z',maxlen,"file-z",
+               "      ",'z',
+               maxlen,"file-z",
                "<arg>",
                "* ",
                "matrix with normals z component",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'F',maxlen,"full-only",
+               "      ",'F',
+               maxlen,"full-only",
                "     ",
                "  ",
                "use full streamlines only",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'H',maxlen,"height",
+               "      ",'H',
+               maxlen,"height",
                "     ",
                "  ",
                "compute thickness along full streamlines",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'m',maxlen,"maxiter",
+               "      ",'m',
+               maxlen,"maxiter",
                "<arg>",
                "  ",
                "maximum iterations per streamline",
-               " [""4000""]");
+               " [" "4000" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'n',maxlen,"nstep",
+               "      ",'n',
+               maxlen,"nstep",
                "<arg>",
                "  ",
                "number of time steps per integration step",
-               " [""2""]");
+               " [" "2" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'N',maxlen,"nstep-path",
+               "      ",'N',
+               maxlen,"nstep-path",
                "<arg>",
                "  ",
                "number of steps for height/depth integration",
-               " [""1000""]");
+               " [" "1000" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'a',maxlen,"offset-x",
+               "      ",'a',
+               maxlen,"offset-x",
                "<arg>",
                "* ",
                "x coordinate offset",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'b',maxlen,"offset-y",
+               "      ",'b',
+               maxlen,"offset-y",
                "<arg>",
                "* ",
                "y coordinate offset",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'c',maxlen,"offset-z",
+               "      ",'c',
+               maxlen,"offset-z",
                "<arg>",
                "* ",
                "z coordinate offset",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'o',maxlen,"output",
+               "      ",'o',
+               maxlen,"output",
                "<arg>",
                "  ",
                "output file",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'O',maxlen,"output-dir",
+               "      ",'O',
+               maxlen,"output-dir",
                "<arg>",
                "  ",
                "output directory",
-               " [""streamlines""]");
+               " [" "streamlines" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'p',maxlen,"print",
+               "      ",'p',
+               maxlen,"print",
                "     ",
                "  ",
                "print streamlines",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'L',maxlen,"proj-rdepth",
+               "      ",'L',
+               maxlen,"proj-rdepth",
                "<arg>",
                "  ",
                "relative depth of projection surface",
-               " [""0.5""]");
+               " [" "0.5" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'s',maxlen,"proj-side",
+               "      ",'s',
+               maxlen,"proj-side",
                "<arg>",
                "  ",
                "side of projection surface (bottom / top)",
-               " [""TOP""]");
+               " [" "TOP" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'r',maxlen,"reverse",
+               "      ",'r',
+               maxlen,"reverse",
                "     ",
                "  ",
                "reverse normals",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'h',maxlen,"tstep",
+               "      ",'h',
+               maxlen,"tstep",
                "<arg>",
                "  ",
                "integration time step",
-               " [""0.5""]");
+               " [" "0.5" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'U',maxlen,"uncompressed",
+               "      ",'U',
+               maxlen,"uncompressed",
                "     ",
                "  ",
                "uncompressed input files",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'u',maxlen,"voxel-x",
+               "      ",'u',
+               maxlen,"voxel-x",
                "<arg>",
                "* ",
                "voxel x dimension",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'v',maxlen,"voxel-y",
+               "      ",'v',
+               maxlen,"voxel-y",
                "<arg>",
                "* ",
                "voxel y dimension",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'w',maxlen,"voxel-z",
+               "      ",'w',
+               maxlen,"voxel-z",
                "<arg>",
                "* ",
                "voxel z dimension",
-               " [""0.0""]");
+               " [" "0.0" "]");
    
     
-                printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+                printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"bin"
-            ,"     "
-            ,"  ","output binary streamlines","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"bin",
+            "     ","  ","output binary streamlines","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"first"
-            ,"<arg>"
-            ,"  ","first voxel to process","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"first",
+            "<arg>","  ","first voxel to process","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"help"
-            ,"     "
-            ,"  ","print usage information","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"help",
+            "     ","  ","print usage information","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"last"
-            ,"<arg>"
-            ,"  ","last voxel to process","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"last",
+            "<arg>","  ","last voxel to process","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"randomize"
-            ,"     "
-            ,"  ","randomize voxel indices","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"randomize",
+            "     ","  ","randomize voxel indices","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"seed"
-            ,"<arg>"
-            ,"  ","set random seed","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"seed",
+            "<arg>","  ","set random seed","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"usage"
-            ,"     "
-            ,"  ","alias for --help","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"usage",
+            "     ","  ","alias for --help","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"verbose"
-            ,"     "
-            ,"  ","print diagnostic messages","");
+            maxlen,"verbose",
+            "     ","  ","print diagnostic messages","");
    }
 }
 
@@ -754,266 +846,288 @@ int main(int argc, char *argv[]) {
 
     
             printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'V',maxlen,"as-voxels",
+               "      ",'V',
+               maxlen,"as-voxels",
                "     ",
                "  ",
                "interpret input points as voxel indices",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'B',maxlen,"background",
+               "      ",'B',
+               maxlen,"background",
                "<arg>",
                "  ",
                "background value",
-               " [""NAN""]");
+               " [" "NAN" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'D',maxlen,"depth",
+               "      ",'D',
+               maxlen,"depth",
                "     ",
                "  ",
                "compute depth along full streamlines",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'i',maxlen,"dim-x",
+               "      ",'i',
+               maxlen,"dim-x",
                "<arg>",
                "* ",
                "matrix x dimension",
-               " [""0""]");
+               " [" "0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'j',maxlen,"dim-y",
+               "      ",'j',
+               maxlen,"dim-y",
                "<arg>",
                "* ",
                "matrix y dimension",
-               " [""0""]");
+               " [" "0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'k',maxlen,"dim-z",
+               "      ",'k',
+               maxlen,"dim-z",
                "<arg>",
                "* ",
                "matrix z dimension",
-               " [""0""]");
+               " [" "0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'E',maxlen,"epsabs",
+               "      ",'E',
+               maxlen,"epsabs",
                "<arg>",
                "  ",
                "absolute epsilon of ODE solver",
-               " [""1E-3""]");
+               " [" "1E-3" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'1',maxlen,"epsilon-one",
+               "      ",'1',
+               maxlen,"epsilon-one",
                "<arg>",
                "  ",
                "near-one epsilon",
-               " [""1E-2""]");
+               " [" "1E-2" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'0',maxlen,"epsilon-zero",
+               "      ",'0',
+               maxlen,"epsilon-zero",
                "<arg>",
                "  ",
                "near-zero epsilon",
-               " [""1E-2""]");
+               " [" "1E-2" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'e',maxlen,"epsrel",
+               "      ",'e',
+               maxlen,"epsrel",
                "<arg>",
                "  ",
                "relative epsilon of ODE solver",
-               " [""1E-3""]");
+               " [" "1E-3" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'f',maxlen,"file",
+               "      ",'f',
+               maxlen,"file",
                "<arg>",
                "  ",
                "input file with streamline initial points",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'l',maxlen,"file-rdepth",
+               "      ",'l',
+               maxlen,"file-rdepth",
                "<arg>",
                "  ",
                "matrix with relative depth information",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'x',maxlen,"file-x",
+               "      ",'x',
+               maxlen,"file-x",
                "<arg>",
                "* ",
                "matrix with normals x component",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'y',maxlen,"file-y",
+               "      ",'y',
+               maxlen,"file-y",
                "<arg>",
                "* ",
                "matrix with normals y component",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'z',maxlen,"file-z",
+               "      ",'z',
+               maxlen,"file-z",
                "<arg>",
                "* ",
                "matrix with normals z component",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'F',maxlen,"full-only",
+               "      ",'F',
+               maxlen,"full-only",
                "     ",
                "  ",
                "use full streamlines only",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'H',maxlen,"height",
+               "      ",'H',
+               maxlen,"height",
                "     ",
                "  ",
                "compute thickness along full streamlines",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'m',maxlen,"maxiter",
+               "      ",'m',
+               maxlen,"maxiter",
                "<arg>",
                "  ",
                "maximum iterations per streamline",
-               " [""4000""]");
+               " [" "4000" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'n',maxlen,"nstep",
+               "      ",'n',
+               maxlen,"nstep",
                "<arg>",
                "  ",
                "number of time steps per integration step",
-               " [""2""]");
+               " [" "2" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'N',maxlen,"nstep-path",
+               "      ",'N',
+               maxlen,"nstep-path",
                "<arg>",
                "  ",
                "number of steps for height/depth integration",
-               " [""1000""]");
+               " [" "1000" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'a',maxlen,"offset-x",
+               "      ",'a',
+               maxlen,"offset-x",
                "<arg>",
                "* ",
                "x coordinate offset",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'b',maxlen,"offset-y",
+               "      ",'b',
+               maxlen,"offset-y",
                "<arg>",
                "* ",
                "y coordinate offset",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'c',maxlen,"offset-z",
+               "      ",'c',
+               maxlen,"offset-z",
                "<arg>",
                "* ",
                "z coordinate offset",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'o',maxlen,"output",
+               "      ",'o',
+               maxlen,"output",
                "<arg>",
                "  ",
                "output file",
                "");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'O',maxlen,"output-dir",
+               "      ",'O',
+               maxlen,"output-dir",
                "<arg>",
                "  ",
                "output directory",
-               " [""streamlines""]");
+               " [" "streamlines" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'p',maxlen,"print",
+               "      ",'p',
+               maxlen,"print",
                "     ",
                "  ",
                "print streamlines",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'L',maxlen,"proj-rdepth",
+               "      ",'L',
+               maxlen,"proj-rdepth",
                "<arg>",
                "  ",
                "relative depth of projection surface",
-               " [""0.5""]");
+               " [" "0.5" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'s',maxlen,"proj-side",
+               "      ",'s',
+               maxlen,"proj-side",
                "<arg>",
                "  ",
                "side of projection surface (bottom / top)",
-               " [""TOP""]");
+               " [" "TOP" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'r',maxlen,"reverse",
+               "      ",'r',
+               maxlen,"reverse",
                "     ",
                "  ",
                "reverse normals",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'h',maxlen,"tstep",
+               "      ",'h',
+               maxlen,"tstep",
                "<arg>",
                "  ",
                "integration time step",
-               " [""0.5""]");
+               " [" "0.5" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'U',maxlen,"uncompressed",
+               "      ",'U',
+               maxlen,"uncompressed",
                "     ",
                "  ",
                "uncompressed input files",
-               " [""false""]");
+               " [" "false" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'u',maxlen,"voxel-x",
+               "      ",'u',
+               maxlen,"voxel-x",
                "<arg>",
                "* ",
                "voxel x dimension",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'v',maxlen,"voxel-y",
+               "      ",'v',
+               maxlen,"voxel-y",
                "<arg>",
                "* ",
                "voxel y dimension",
-               " [""0.0""]");
+               " [" "0.0" "]");
            printf("%s-%c, --%-*s %s%s " ":" " %s%s" "\n",
-               "      ",'w',maxlen,"voxel-z",
+               "      ",'w',
+               maxlen,"voxel-z",
                "<arg>",
                "* ",
                "voxel z dimension",
-               " [""0.0""]");
+               " [" "0.0" "]");
    
     
-                printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+                printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"bin"
-            ,"     "
-            ,"  ","output binary streamlines","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"bin",
+            "     ","  ","output binary streamlines","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"first"
-            ,"<arg>"
-            ,"  ","first voxel to process","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"first",
+            "<arg>","  ","first voxel to process","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"help"
-            ,"     "
-            ,"  ","print usage information","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"help",
+            "     ","  ","print usage information","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"last"
-            ,"<arg>"
-            ,"  ","last voxel to process","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"last",
+            "<arg>","  ","last voxel to process","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"randomize"
-            ,"     "
-            ,"  ","randomize voxel indices","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"randomize",
+            "     ","  ","randomize voxel indices","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"seed"
-            ,"<arg>"
-            ,"  ","set random seed","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"seed",
+            "<arg>","  ","set random seed","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"usage"
-            ,"     "
-            ,"  ","alias for --help","");
-               printf("%s    --%-*s %s%s " ":" " %s%s" "\n"
-            ,"      "
+            maxlen,"usage",
+            "     ","  ","alias for --help","");
+               printf("%s    --%-*s %s%s " ":" " %s%s" "\n",
+            "      ",
             
-            ,maxlen,"verbose"
-            ,"     "
-            ,"  ","print diagnostic messages","");
+            maxlen,"verbose",
+            "     ","  ","print diagnostic messages","");
    }
     exit(EXIT_SUCCESS);
-    }
-    else { // process option tables
-        char *old_argv0 = argv[0];
-        
-
+    } else { // process option tables
         const char *optlabel = NULL; 
         (void)optlabel;
 
@@ -1102,8 +1216,13 @@ int main(int argc, char *argv[]) {
                    { NULL, 0, NULL, 0 }
         };
 
+        opterr = 0; // silent
         /* build optstring */
-        const char optstring[] = "0:1:a:b:c:B:De:E:f:Fh:Hi:j:k:l:L:m:n:N:po:O:rs:UVu:v:w:x:y:z:";
+        const char optstring[] =
+#if 1
+            ":"
+#endif
+            "0:1:a:b:c:B:De:E:f:Fh:Hi:j:k:l:L:m:n:N:po:O:rs:UVu:v:w:x:y:z:";
 
         int opt, longidx;
         bool getopt_verbose = false; // --verbose passed
@@ -1175,15 +1294,23 @@ int main(int argc, char *argv[]) {
     }
                 }
             }
-            else if('?' == opt || ':' == opt) {
-                if(optopt == 0) {
+            else if('?' == opt || ':' == opt) { // getopt error
+                bool missing_arg = (':' == opt);
+#define OPBUFSIZ 128
+                if(optopt == 0 || optopt == true) { // long option
                     size_t oplen = 0; // length until '='
                     const char *optxt = argv[optind - 1] + 2; // start after '--'
                     for(const char *c = optxt; '\0' != *c && *c != '='; ++c, ++oplen);
-                    char opbuf[oplen + 1]; (void)opbuf;
+                    char opbuf[oplen + 1]; // VLA
                     for(size_t i = 0; i < oplen; ++i) opbuf[i] = optxt[i];
                     opbuf[oplen] = '\0';
-                    
+                        if(missing_arg) { error("option --%s requires an argument",opbuf); }
+    else { error("unknown option --%s",opbuf); }
+
+                } else { // short option
+                        if(missing_arg) { error("option -%c requires an argument",optopt); }
+    else { error("unknown option -%c",optopt); }
+
                 }
                 exit(EXIT_FAILURE);
             } else { /* long options with short option */
@@ -1200,7 +1327,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.eps_zero)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1215,7 +1342,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.eps_one)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1230,7 +1357,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.off_x)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1245,7 +1372,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.off_y)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1260,7 +1387,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.off_z)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1275,7 +1402,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.background)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1302,7 +1429,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.epsrel)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1317,7 +1444,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.epsabs)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1357,7 +1484,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.tstep)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1442,7 +1569,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.proj_rdepth)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1587,7 +1714,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.vox_x)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1602,7 +1729,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.vox_y)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1617,7 +1744,7 @@ int main(int argc, char *argv[]) {
 
                         /* option default actions, overriden by user-defined actions below */
                             if(optarg && strtod_check(optarg,&opts.vox_z)) {
-        error("Not a floating-point or empty argument passed to %s: %s",optlabel,optarg);
+        error("Not a floating-point number, out of bounds, or empty argument passed to %s: %s",optlabel,optarg);
         exit(EXIT_FAILURE);
     }
                     break;
@@ -1756,72 +1883,72 @@ int main(int argc, char *argv[]) {
         {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.asvox ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'V',maxlen,"as-voxels"
-                ,opts.asvox_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'V',maxlen,"as-voxels",
+                opts.asvox_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.background,opts.background);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'B',maxlen,"background"
-                ,opts.background_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'B',maxlen,"background",
+                opts.background_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.do_depth ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'D',maxlen,"depth"
-                ,opts.do_depth_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'D',maxlen,"depth",
+                opts.do_depth_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "zu",opts.dim_x);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'i',maxlen,"dim-x"
-                ,opts.dim_x_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'i',maxlen,"dim-x",
+                opts.dim_x_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "zu",opts.dim_y);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'j',maxlen,"dim-y"
-                ,opts.dim_y_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'j',maxlen,"dim-y",
+                opts.dim_y_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "zu",opts.dim_z);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'k',maxlen,"dim-z"
-                ,opts.dim_z_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'k',maxlen,"dim-z",
+                opts.dim_z_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.epsabs,opts.epsabs);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'E',maxlen,"epsabs"
-                ,opts.epsabs_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'E',maxlen,"epsabs",
+                opts.epsabs_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.eps_one,opts.eps_one);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'1',maxlen,"epsilon-one"
-                ,opts.eps_one_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'1',maxlen,"epsilon-one",
+                opts.eps_one_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.eps_zero,opts.eps_zero);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'0',maxlen,"epsilon-zero"
-                ,opts.eps_zero_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'0',maxlen,"epsilon-zero",
+                opts.eps_zero_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.epsrel,opts.epsrel);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'e',maxlen,"epsrel"
-                ,opts.epsrel_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'e',maxlen,"epsrel",
+                opts.epsrel_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1829,9 +1956,9 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.file) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'f',maxlen,"file"
-                ,opts.file_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'f',maxlen,"file",
+                opts.file_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1839,9 +1966,9 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.file_rdepth) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'l',maxlen,"file-rdepth"
-                ,opts.file_rdepth_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'l',maxlen,"file-rdepth",
+                opts.file_rdepth_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1849,9 +1976,9 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.file_x) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'x',maxlen,"file-x"
-                ,opts.file_x_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'x',maxlen,"file-x",
+                opts.file_x_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1859,9 +1986,9 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.file_y) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'y',maxlen,"file-y"
-                ,opts.file_y_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'y',maxlen,"file-y",
+                opts.file_y_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1869,65 +1996,65 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.file_z) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'z',maxlen,"file-z"
-                ,opts.file_z_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'z',maxlen,"file-z",
+                opts.file_z_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.full_only ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'F',maxlen,"full-only"
-                ,opts.full_only_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'F',maxlen,"full-only",
+                opts.full_only_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.do_height ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'H',maxlen,"height"
-                ,opts.do_height_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'H',maxlen,"height",
+                opts.do_height_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "zu",opts.maxiter);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'m',maxlen,"maxiter"
-                ,opts.maxiter_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'m',maxlen,"maxiter",
+                opts.maxiter_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "zu",opts.nstep);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'n',maxlen,"nstep"
-                ,opts.nstep_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'n',maxlen,"nstep",
+                opts.nstep_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "zu",opts.nstep_path);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'N',maxlen,"nstep-path"
-                ,opts.nstep_path_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'N',maxlen,"nstep-path",
+                opts.nstep_path_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.off_x,opts.off_x);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'a',maxlen,"offset-x"
-                ,opts.off_x_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'a',maxlen,"offset-x",
+                opts.off_x_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.off_y,opts.off_y);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'b',maxlen,"offset-y"
-                ,opts.off_y_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'b',maxlen,"offset-y",
+                opts.off_y_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.off_z,opts.off_z);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'c',maxlen,"offset-z"
-                ,opts.off_z_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'c',maxlen,"offset-z",
+                opts.off_z_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1935,9 +2062,9 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.outfile) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'o',maxlen,"output"
-                ,opts.outfile_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'o',maxlen,"output",
+                opts.outfile_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
@@ -1945,110 +2072,109 @@ int main(int argc, char *argv[]) {
     else if(snprintf(buf,sizeof(buf),"%s",opts.outdir) >= (int)sizeof(buf)) {
         (void)snprintf(buf + sizeof(buf) - 4,4,"...");
     }
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'O',maxlen,"output-dir"
-                ,opts.outdir_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'O',maxlen,"output-dir",
+                opts.outdir_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.do_print ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'p',maxlen,"print"
-                ,opts.do_print_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'p',maxlen,"print",
+                opts.do_print_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.proj_rdepth,opts.proj_rdepth);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'L',maxlen,"proj-rdepth"
-                ,opts.proj_rdepth_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'L',maxlen,"proj-rdepth",
+                opts.proj_rdepth_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
-                verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'s',maxlen,"proj-side"
-                ,opts.proj_side_isset ? "  <set>" : "<unset>","",buf," .");
+                verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'s',maxlen,"proj-side",
+                opts.proj_side_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.reverse ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'r',maxlen,"reverse"
-                ,opts.reverse_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'r',maxlen,"reverse",
+                opts.reverse_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.tstep,opts.tstep);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'h',maxlen,"tstep"
-                ,opts.tstep_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'h',maxlen,"tstep",
+                opts.tstep_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%s",opts.uncompr ? "<true>" : "<false>");
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'U',maxlen,"uncompressed"
-                ,opts.uncompr_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'U',maxlen,"uncompressed",
+                opts.uncompr_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.vox_x,opts.vox_x);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'u',maxlen,"voxel-x"
-                ,opts.vox_x_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'u',maxlen,"voxel-x",
+                opts.vox_x_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.vox_y,opts.vox_y);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'v',maxlen,"voxel-y"
-                ,opts.vox_y_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'v',maxlen,"voxel-y",
+                opts.vox_y_isset ? "  <set>" : "<unset>","",buf," .");
     }
        {
         char buf[1024] = "<non-representable>";
             (void)snprintf(buf,sizeof(buf),"%" "g" " (%" "a" ")",opts.vox_z,opts.vox_z);
-        verbose("%s-%c, --%-*s %s%s " "=" " %s%s"
-                ,"      ",'w',maxlen,"voxel-z"
-                ,opts.vox_z_isset ? "  <set>" : "<unset>","",buf," .");
+        verbose("%s-%c, --%-*s %s%s " "=" " %s%s",
+                "      ",'w',maxlen,"voxel-z",
+                opts.vox_z_isset ? "  <set>" : "<unset>","",buf," .");
     }
    
     
-                verbose("%s    --%-*s %s%s " "" " %s%s"
-            ,"      ",maxlen,"bin"
-            ,longopt_isset[5] ? "  <set>" : "<unset>","","","");
-               if(longopt_isset[3]) {
-        verbose("%s    --%-*s %s%s " "=" " %s%s"
-                ,"      ",maxlen,"first","  <set>","",longopt_arg[3],"");
-    } else {
-        verbose("%s    --%-*s %s%s " "" " %s%s"
-                ,"      ",maxlen,"first","<unset>","","","");
-    }
-               verbose("%s    --%-*s %s%s " "" " %s%s"
-            ,"      ",maxlen,"help"
-            ,longopt_isset[0] ? "  <set>" : "<unset>","","","");
-               if(longopt_isset[4]) {
-        verbose("%s    --%-*s %s%s " "=" " %s%s"
-                ,"      ",maxlen,"last","  <set>","",longopt_arg[4],"");
-    } else {
-        verbose("%s    --%-*s %s%s " "" " %s%s"
-                ,"      ",maxlen,"last","<unset>","","","");
-    }
-               verbose("%s    --%-*s %s%s " "" " %s%s"
-            ,"      ",maxlen,"randomize"
-            ,longopt_isset[6] ? "  <set>" : "<unset>","","","");
-               if(longopt_isset[7]) {
-        verbose("%s    --%-*s %s%s " "=" " %s%s"
-                ,"      ",maxlen,"seed","  <set>","",longopt_arg[7],"");
-    } else {
-        verbose("%s    --%-*s %s%s " "" " %s%s"
-                ,"      ",maxlen,"seed","<unset>","","","");
-    }
-               verbose("%s    --%-*s %s%s " "" " %s%s"
-            ,"      ",maxlen,"usage"
-            ,longopt_isset[1] ? "  <set>" : "<unset>","","","");
-               verbose("%s    --%-*s %s%s " "" " %s%s"
-            ,"      ",maxlen,"verbose"
-            ,longopt_isset[2] ? "  <set>" : "<unset>","","","");
+                verbose("%s    --%-*s %s%s " "" " %s%s","      ",
+            maxlen,"bin",
+            longopt_isset[5] ? "  <set>" : "<unset>",
+            "","","");
+               verbose("%s    --%-*s %s%s %s %s%s","      ",
+            maxlen,"first",
+            longopt_isset[3] ? "  <set>" : "<unset>","",
+            longopt_isset[3] ? "=" : "",
+            longopt_isset[3] ? longopt_arg[3] : "","");
+               verbose("%s    --%-*s %s%s " "" " %s%s","      ",
+            maxlen,"help",
+            longopt_isset[0] ? "  <set>" : "<unset>",
+            "","","");
+               verbose("%s    --%-*s %s%s %s %s%s","      ",
+            maxlen,"last",
+            longopt_isset[4] ? "  <set>" : "<unset>","",
+            longopt_isset[4] ? "=" : "",
+            longopt_isset[4] ? longopt_arg[4] : "","");
+               verbose("%s    --%-*s %s%s " "" " %s%s","      ",
+            maxlen,"randomize",
+            longopt_isset[6] ? "  <set>" : "<unset>",
+            "","","");
+               verbose("%s    --%-*s %s%s %s %s%s","      ",
+            maxlen,"seed",
+            longopt_isset[7] ? "  <set>" : "<unset>","",
+            longopt_isset[7] ? "=" : "",
+            longopt_isset[7] ? longopt_arg[7] : "","");
+               verbose("%s    --%-*s %s%s " "" " %s%s","      ",
+            maxlen,"usage",
+            longopt_isset[1] ? "  <set>" : "<unset>",
+            "","","");
+               verbose("%s    --%-*s %s%s " "" " %s%s","      ",
+            maxlen,"verbose",
+            longopt_isset[2] ? "  <set>" : "<unset>",
+            "","","");
    }
         }
 
@@ -2060,8 +2186,6 @@ const size_t _0 = _idx;
 const size_t _idx = 0; (void)_idx;
 { free(( ( ( longopt_arg ) ) [ _0 ] )); (( ( ( longopt_arg ) ) [ _0 ] )) = NULL; }}
 }
-
-        argv[0] = old_argv0;
     }
 
     if(opts.do_height_isset && opts.do_depth_isset) {

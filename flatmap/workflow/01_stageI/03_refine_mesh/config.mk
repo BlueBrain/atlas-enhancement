@@ -1,5 +1,6 @@
 # paths to executables
 GMSH_BIN := gmsh
+$(eval $(call required,$(GMSH_BIN)))
 OFF2PLY_BIN := $(AWK) -f $(SOURCE_CODE_ROOT)/utils/off2ply.awk
 PLY2OFF_BIN := $(AWK) -f $(SOURCE_CODE_ROOT)/utils/ply2off.awk
 

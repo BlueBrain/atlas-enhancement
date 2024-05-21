@@ -3,15 +3,20 @@ JQ := jq
 MAGICK := magick
 
 # DO NOT EDIT BELOW THIS LINE
-FLATVIEW_MORPHO_PNG_FILE := $(subst .json,.png,$(FLATVIEW_MORPHO_INPUT_FILE))
+FLATVIEW_MORPHO_JSON_FILE = $(notdir $(FLATVIEW_MORPHO_INPUT_FILE))
+FLATVIEW_MORPHO_PNG_FILE = $(subst .json,.png,$(FLATVIEW_MORPHO_JSON_FILE))
 
-override INPUTS := input/$(FLATMAP_NRRD_FILE)\
-	input/$(FLATVIEW_MORPHO_INPUT_FILE)\
+ifeq (1,$(BOTH))
+override INPUTS := input/$(FLATVIEW_MORPHO_JSON_FILE)\
+	input/$(FLATMAP_BOTH_NRRD_FILE)\
+	input/$(FLATVIEW_ANNOTATIONS_BOTH_FILE)
+else
+override INPUTS := input/$(FLATVIEW_MORPHO_JSON_FILE)\
+	input/$(FLATMAP_NRRD_FILE)\
 	input/$(FLATVIEW_ANNOTATIONS_FILE)
+endif
 
-override OUTPUTS := output/$(FLATVIEW_MORPHO_PNG_FILE)\
-	output/flat_soma_dots.xyz\
-	output/flat_axon_dots.xyz
+override OUTPUTS := output/$(FLATVIEW_MORPHO_PNG_FILE)
 
 override USER_PARAMETERS := FLATPLOT_MORPHO_EXTRA\
 	PIXEL_RESOLUTION

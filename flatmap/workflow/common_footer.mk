@@ -1,4 +1,4 @@
-$(addprefix input/,$(USER_INPUT_FILES)) input/$(ANNOTATIONS_FILE) input/$(MASK_FILE): input/%: $(USER_DATA_ROOT)/%
+$(addprefix input/,$(USERDATA)): input/%: $(USER_DATA_ROOT)/%
 	$(LN) -sf $< $@
 
 input/%:
@@ -13,7 +13,7 @@ export:
 	cp $(OUTPUTS) $(EXPORT_DIR)
 else
 export:
-	$(error Please set EXPORT_DIR)
+	$(error Please set EXPORT_DIR to export directory)
 endif
 
 # view
@@ -24,6 +24,14 @@ view-nrrd:
 .PHONY: view-image
 view-image:
 	$(foreach o,$(OUTPUTS),$(IMAGE_VIEWER) $o;)
+
+.PHONY: view-txt
+view-txt:
+	$(foreach o,$(OUTPUTS),$(PAGER) $o;)
+
+.PHONY: view-pdf
+view-pdf:
+	$(foreach o,$(OUTPUTS),$(PDF_VIEWER) $o;)
 
 # cleanup
 .PHONY: clean clean-all clean-inputs clean-outputs

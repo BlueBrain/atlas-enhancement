@@ -51,6 +51,10 @@ PIXEL_RESOLUTION := 160
 ## color map for flat view of annotations
 FLATVIEW_ANNOTATIONS_COLORMAP := '\#a6cee3,\#1f78b4,\#b2df8a,\#33a02c,\#fb9a99,\#e31a1c,\#fdbf6f,\#ff7f00,\#cab2d6,\#6a3d9a,\#ffff99'
 
+## per-pixel metrics resolutions
+METRICS_RESOLUTION := 320 160 80 40 20
+HEATMAP_SCALING := 1 2 4 8 16
+
 ## extra arguments to heatmap plots
 PREIMAGE_SIZE_DISCRETE_PLOT_EXTRA := --minval=0.0 -c sns:viridis
 PREIMAGE_SIZE_UNIFORMITY_PLOT_EXTRA := --minval=-1.0 --maxval=3.0 -c sns:coolwarm

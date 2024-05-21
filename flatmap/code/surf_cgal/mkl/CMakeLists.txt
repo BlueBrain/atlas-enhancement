@@ -27,6 +27,8 @@ if ( NOT Boost_FOUND )
 
 endif()
 
+create_single_source_cgal_program( "Flatten_Authalic_Iterative_convex.cxx" )
+create_single_source_cgal_program( "Flatten_Authalic_Iterative_parametric.cxx" )
 create_single_source_cgal_program( "Flatten_Authalic_Iterative.cxx" )
 
 
@@ -35,6 +37,8 @@ find_package(Eigen3 3.1.0) #(requires 3.1.0 or greater)
 include(CGAL_Eigen3_support)
 if(TARGET CGAL::Eigen3_support)
 
+    target_link_libraries(Flatten_Authalic_Iterative_convex PUBLIC CGAL::Eigen3_support)
+    target_link_libraries(Flatten_Authalic_Iterative_parametric PUBLIC CGAL::Eigen3_support)
     target_link_libraries(Flatten_Authalic_Iterative PUBLIC CGAL::Eigen3_support)
 
 else()
@@ -51,6 +55,8 @@ include(CGAL_TBB_support)
 if(TARGET CGAL::TBB_support)
 
     message(STATUS "NOTICE: Intel TBB will be used for this project.")
+    target_link_libraries(Flatten_Authalic_Iterative_convex PUBLIC CGAL::TBB_support)
+    target_link_libraries(Flatten_Authalic_Iterative_parametric PUBLIC CGAL::TBB_support)
     target_link_libraries(Flatten_Authalic_Iterative PUBLIC CGAL::TBB_support)
 
 else()
@@ -64,6 +70,8 @@ endif()
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)
 
+    target_link_libraries(Flatten_Authalic_Iterative_convex PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(Flatten_Authalic_Iterative_parametric PUBLIC OpenMP::OpenMP_CXX)
     target_link_libraries(Flatten_Authalic_Iterative PUBLIC OpenMP::OpenMP_CXX)
 
 endif()
@@ -71,6 +79,14 @@ endif()
 # Intel MKL for Eigen
 find_package(MKL CONFIG REQUIRED)
 if(1)
+
+    target_compile_options(Flatten_Authalic_Iterative_convex PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    target_include_directories(Flatten_Authalic_Iterative_convex PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_link_libraries(Flatten_Authalic_Iterative_convex PUBLIC $<LINK_ONLY:MKL::MKL>)
+
+    target_compile_options(Flatten_Authalic_Iterative_parametric PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+    target_include_directories(Flatten_Authalic_Iterative_parametric PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_link_libraries(Flatten_Authalic_Iterative_parametric PUBLIC $<LINK_ONLY:MKL::MKL>)
 
     target_compile_options(Flatten_Authalic_Iterative PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
     target_include_directories(Flatten_Authalic_Iterative PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_INCLUDE_DIRECTORIES>)

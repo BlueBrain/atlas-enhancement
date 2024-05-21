@@ -1,0 +1,19 @@
+# path to executable
+RESAMPLE_FLATMAP_BIN := $(PYTHON3) $(SOURCE_CODE_ROOT)/utils/resample.py
+
+# DO NOT EDIT BELOW THIS LINE
+ifeq (1,$(DISCRETE))
+override INPUTS := input/$(FLATMAP_DISCRETE_NRRD_FILE)
+
+override OUTPUTS := output/$(FLATMAP_RESAMPLED_DISCRETE_NRRD_FILE)
+
+override USER_PARAMETERS := PIXEL_RESOLUTION
+else
+override INPUTS := input/$(FLATMAP_NRRD_FILE)
+
+override OUTPUTS := output/$(FLATMAP_RESAMPLED_NRRD_FILE)
+
+override USER_PARAMETERS :=
+endif
+
+override USER_BINARIES := RESAMPLE_FLATMAP_BIN
