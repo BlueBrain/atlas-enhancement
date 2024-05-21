@@ -18,7 +18,7 @@ To generate depth and orientation fields, please refer to the documentation of t
 
 ## Flatmapping
 
-Complete workflow to generate flatmaps and perform flatmap-based applications. For more details, please look at the [README](flatmap/README.md) under `flatmap`.
+Complete workflow to generate flatmaps and perform flatmap-based applications, including visualizing 3D datasets in flat space. For more details, please look at the [README](flatmap/README.md) under `flatmap`.
 
 
 ## Annotation of barrels and barrel columns 
