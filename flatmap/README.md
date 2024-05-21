@@ -48,19 +48,20 @@ As part of the workflow:
 
 1. Change directory to `applications/flatview_3d_data`.
 2. Run `make FLATVIEW_DATA_INPUT_FILE="<path to input data>"`.
-3. Extra arguments to `flatplot` can be passed in `FLATPLOT_DATA_EXTRA`.
+3. Extra arguments to `flatplot` can be passed in the variable `FLATPLOT_DATA_EXTRA`.
 4. Find output image under `output/`.
 
 Stand-alone:
 
-1. Run `$ATLAS_ENHANCEMENT_ROOT/flatmap/code/bin/flatplot <flatmap NRRD> <data NRRD> <output prefix>`.
-2. Some common options are:
+1. The [flatplot](code/utils/flatplot.py) script can be found in `$ATLAS_ENHANCEMENT_ROOT/flatmap/code/utils/flatplot.py`.
+2. Run it like `flatplot <flatmap NRRD> <data NRRD> <output prefix>`.
+3. Some common options are:
    + `--flatpix`: specify pixel resolution of output image
    + `--autospan`: get value range from data, instead of [0,1]
    + `--colormap`: set color map from `colorcet` as `cet:*`, from `seaborn` as `sns:*`, from `cmcrameri` as `cmc:*`, or as a comma-separated list of hexadecimal RGB colors (`#XXXXXX`)
    + `--reduction`: specify aggregation function, e.g. `max`, `mean`, etc.
    + `--layers`: path to layers NRRD (1-based integers), to be used with `--split` to plot each layer separately, or `--only-layer` to plot a specific layer.
-4. For full CLI options, run `flatplot` with no arguments.
+4. For full CLI options, run `flatplot --help`.
 
 ### Input file requirements
 
