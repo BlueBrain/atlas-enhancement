@@ -45,6 +45,8 @@ if __name__ == "__main__":
             help="Background value in regions NNRD input")
     parser.add_argument("--dots", default=False, action="store_true",
             help="Plot flat dots (no reduction)")
+    parser.add_argument("--h5morpho", default=None,
+            help="Plot morphology in H5 format (soma, axon)")
     parser.add_argument("--reflect", default=False, action="store_true",
             help="Reflect dots (hemisphere swap)")
     parser.add_argument("--autospan", default=False, action="store_true",
@@ -58,6 +60,10 @@ if __name__ == "__main__":
 
     if args.split and args.layers is None:
         LOGGER.error('Layer annotation is required for split flat views')
+        sys.exit(1)
+
+    if args.h5morpho is not None and args.h5morpho not in ["soma", "axon"]:
+        LOGGER.error('--h5morpho only takes values: soma, axon')
         sys.exit(1)
 
 
@@ -192,9 +198,19 @@ if __name__ == "__main__":
 
     lay = None
     if args.dots:
-        LOGGER.info('Loading dots "{}"'.format(args.dataset))
-        dots = np.loadtxt(args.dataset)
-        dots = dots.reshape((-1, 3))
+        if args.h5morpho is not None:
+            LOGGER.info('Loading {} points of H5 morphology "{}"'.format(args.h5morpho, args.dataset))
+            from morphio import Morphology, SectionType
+
+            m = Morphology(args.dataset)
+            if args.h5morpho == "soma":
+                dots = m.soma.points
+            else:
+                dots = np.vstack([sec.points for sec in m.sections if sec.type == SectionType.axon])
+        else:
+            LOGGER.info('Loading dots "{}"'.format(args.dataset))
+            dots = np.loadtxt(args.dataset)
+            dots = dots.reshape((-1, 3))
 
         if args.reflect:
             zmax = fmap.bbox[1, 2]
