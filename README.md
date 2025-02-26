@@ -1,3 +1,7 @@
+> [!WARNING]
+> The Blue Brain Project concluded in December 2024, so development has ceased under the BlueBrain GitHub organization.
+> Future development will take place at: https://github.com/openbraininstitute/atlas-enhancement
+
 # Enhancement of brain atlases with laminar coordinate systems: Flatmaps and barrel column annotations
 
 This code accompanies the manuscript "Enhancement of brain atlases with laminar coordinate systems: Flatmaps and barrel column annotations" by S. Bolaños-Puchet, A. Teska, et al.
